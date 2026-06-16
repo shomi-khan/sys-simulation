@@ -21,6 +21,7 @@ interface Problem {
   availableComponents: ComponentType[]
   successConditions: SuccessCondition[]
   scoringProfile: ScoringProfile  // references a named weight config
+  unlocksAfter: string | null  // problem id of prerequisite, null = always unlocked
 }
 ```
 

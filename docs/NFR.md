@@ -52,3 +52,9 @@
 - Every function must have a **JSDoc comment** explaining parameters, return value, and side effects.
 - Complex logic (simulation math, DAG traversal, score calculation) must have **inline comments** explaining the reasoning, not just the mechanics.
 - Comments should explain **why**, not just **what**.
+
+## 10. Progressive Unlock System
+
+- A challenge is **locked** until its prerequisite challenge is solved.
+- Solved state persists in **localStorage** — no backend needed.
+- The first challenge is always unlocked (`unlocksAfter: null`).
