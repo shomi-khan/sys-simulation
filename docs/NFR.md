@@ -45,3 +45,10 @@
 
 - The simulation must produce **deterministic results** for the same architecture input.
 - Score calculation must be **pure functions** — no side effects, no randomness.
+
+## 9. Code Readability
+
+- Every file must have a **top-level comment** explaining what it does and why it exists.
+- Every function must have a **JSDoc comment** explaining parameters, return value, and side effects.
+- Complex logic (simulation math, DAG traversal, score calculation) must have **inline comments** explaining the reasoning, not just the mechanics.
+- Comments should explain **why**, not just **what**.
