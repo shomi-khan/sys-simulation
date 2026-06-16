@@ -113,5 +113,5 @@ src/
 
 - This project lives in its own **git repository**.
 - It is embedded in the portfolio via **git submodule**.
-- Deployed to **GitHub Pages** as a static export (`output: 'export'` in `next.config.ts`).
+- Deployed to **Vercel**. Standard Next.js deployment — no `output: 'export'` needed.
 - All rendering is static or client-side — no Node.js server required at runtime.
