@@ -48,6 +48,9 @@ function balanceColor(balance: number, initialBudget: number): string {
   return 'text-red-600 dark:text-red-400'
 }
 
+/**
+ * ProblemHeader - renders challenge context and simulation controls.
+ */
 export default function ProblemHeader({
   problem,
   simStatus,

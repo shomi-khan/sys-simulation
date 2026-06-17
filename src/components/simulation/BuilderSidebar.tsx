@@ -44,6 +44,9 @@ function latencyStatus(latency: number | null): StatStatus {
   return 'critical'
 }
 
+/**
+ * BuilderSidebar - renders live metrics and terminal output for the builder.
+ */
 export default function BuilderSidebar({
   simState,
   initialBudget,

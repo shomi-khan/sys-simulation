@@ -251,7 +251,7 @@ interface CanvasProps {
   nodes: CanvasNode[]
   /** Edges connecting nodes — managed by parent state */
   edges: CanvasEdge[]
-  /** Called when user drops a new component onto the canvas */
+  /** Called with the full updated node array on any real architecture edit (drop, move-settle, delete) — not on every internal React Flow event */
   onNodesChange: (nodes: CanvasNode[]) => void
   /** Called when user connects two nodes */
   onEdgesChange: (edges: CanvasEdge[]) => void
@@ -268,10 +268,11 @@ import ReactFlow, {
   Controls,
   MiniMap,
   addEdge,
-  useNodesState,
+  applyNodeChanges,
   useEdgesState,
   type Node,
   type Edge,
+  type NodeChange,
   type OnConnect,
   type Connection,
 } from 'reactflow'
@@ -306,6 +307,31 @@ const nodeTypes = {
 Do not write `nodeTypes={{ simulation: SimulationNode }}` inside `<ReactFlow />`.
 React Flow treats inline objects as new references on every render and will warn/re-initialize.
 
+### Local node state & sync with parent (required — fixes node-disappearing bug)
+
+React Flow must own a **local** copy of nodes (`flowNodes`) that drives rendering. This local state is the single source of truth for the canvas. It is synced *out* to parent state (`onNodesChange` prop) only for real architecture edits, and synced *in* from parent state only on external resets (e.g. the Reset button clearing the canvas).
+
+```ts
+// Local React Flow state — source of truth for what's rendered.
+// Initialized from parent `nodes` prop, then updated locally on every
+// drag/drop/delete via handleNodesChange (defined further below). Pushed
+// back to parent only for real architecture changes — never on every
+// event in React Flow's internal change stream.
+const [flowNodes, setFlowNodes] = useState<Node[]>(toFlowNodes(nodes))
+
+// Re-sync local state from parent ONLY when the parent array was cleared
+// externally (Reset button). Internal-origin updates already match parent
+// state by the time this effect would run, so it's a no-op in that case.
+useEffect(() => {
+  if (nodes.length === 0 && flowNodes.length > 0) {
+    setFlowNodes([])
+  }
+}, [nodes.length])
+```
+
+**Why this matters — the bug this prevents:**
+Previously, `onDrop` added a node directly to parent state, but React Flow immediately fires its own internal `onNodesChange` events afterward (dimension measurement, selection). If those internal events were applied via `applyNodeChanges(changes, nodes)` against a **stale** `nodes` closure (captured before the drop's state update had propagated), the result overwrote parent state and silently deleted the just-dropped node. The fix is twofold: (1) keep a local `flowNodes` state that always reflects the latest React Flow changes immediately, and (2) only forward to parent state the change types that represent real architecture edits — never blindly mirror every internal change event.
+
 Node visual:
 ```
 ┌─────────────────────────┐  ← colored border (by category)
@@ -322,6 +348,43 @@ Node visual:
   - 61–89%: `bg-amber-400`
   - 90%+: `bg-red-500`
 - Load bar: `h-1.5 rounded-full` inside a `bg-slate-200 dark:bg-slate-700` track
+
+### handleNodesChange — bridges React Flow events to parent state
+
+```ts
+/**
+ * handleNodesChange — wired to <ReactFlow onNodesChange={handleNodesChange}>.
+ *
+ * Applies every change to local `flowNodes` immediately (so dragging,
+ * selection, and resizing stay visually smooth), but only forwards
+ * REAL architecture edits to parent state:
+ *   - 'position' changes where change.dragging === false (drag has settled)
+ *   - 'remove' changes (node deleted)
+ * All other change types ('dimensions', 'select', in-progress 'position'
+ * with dragging === true) update the local canvas only and are never
+ * pushed to parent state. This is what prevents internal React Flow
+ * events from overwriting a node that was just added via drop.
+ */
+const handleNodesChange = useCallback((changes: NodeChange[]) => {
+  // Always read the freshest state via functional update — never the
+  // `flowNodes` value captured in this callback's closure — so a change
+  // event can never be applied against stale data.
+  setFlowNodes((current) => {
+    const updated = applyNodeChanges(changes, current)
+
+    const isArchitectureChange = changes.some(
+      (c) =>
+        (c.type === 'position' && c.dragging === false) ||
+        c.type === 'remove'
+    )
+    if (isArchitectureChange) {
+      onNodesChange(toCanvasNodes(updated))
+    }
+
+    return updated
+  })
+}, [onNodesChange])
+```
 
 ### onDrop handler
 
@@ -340,8 +403,8 @@ const onDrop = useCallback((event: React.DragEvent) => {
     y: event.clientY - bounds.top,
   })
 
-  // Create a new CanvasNode and add to parent state
-  const newNode: CanvasNode = {
+  // Create a new CanvasNode, converted to React Flow's Node shape
+  const newCanvasNode: CanvasNode = {
     instanceId: `${componentType}-${Date.now()}`,
     type: componentType,
     position,
@@ -349,20 +412,50 @@ const onDrop = useCallback((event: React.DragEvent) => {
     loadPercent: 0,
     status: 'idle',
   }
+  const newFlowNode = toFlowNode(newCanvasNode)
 
-  onNodesChange([...nodes, newNode])
-}, [nodes, onNodesChange, reactFlowInstance])
+  // Add to LOCAL flowNodes via functional update — reads the freshest
+  // state rather than a possibly-stale `flowNodes`/`nodes` closure — then
+  // push the resulting array to parent state. This, combined with
+  // handleNodesChange ignoring non-architecture changes above, is what
+  // makes the dropped node survive React Flow's follow-up internal events.
+  setFlowNodes((current) => {
+    const updated = [...current, newFlowNode]
+    onNodesChange(toCanvasNodes(updated))
+    return updated
+  })
+}, [onNodesChange, reactFlowInstance])
 ```
 
+The drag payload set by `ComponentPalette` must be plain text (`event.dataTransfer.setData('componentType', component.type)`) and read back with `event.dataTransfer.getData('componentType')` — do not use `'application/reactflow'` or JSON-encode the payload; the plain string round-trip is what keeps the drop reliable across browsers.
+
 ### Canvas container
-- `ref={reactFlowWrapper}` on the outer div
-- `onDrop={onDrop}` + `onDragOver={(e) => e.preventDefault()}`
+- `ref={reactFlowWrapper}` on the outer div (used only for `getBoundingClientRect()` in `onDrop`'s coordinate conversion)
+- `<ReactFlow>` itself receives `nodes={flowNodes}`, `onNodesChange={handleNodesChange}`, `onDrop={onDrop}`, `onDragOver={(e) => e.preventDefault()}` — **do not** attach `onDrop`/`onDragOver` to the outer wrapper `div`; attaching them to `<ReactFlow>` directly is required for reliable drops (React Flow's own pointer-capture layer can swallow drop events that land on a sibling/parent element instead).
 - Background: `bg-slate-100 dark:bg-slate-900`
 - Show `<Background />`, `<Controls />`, `<MiniMap />` from React Flow
 - MiniMap node color by status:
   - idle/healthy → `#4ade80`
   - warning → `#fbbf24`
   - overloaded → `#f87171`
+
+### Node ↔ CanvasNode conversion
+React Flow uses its own `Node` type. Convert to/from `CanvasNode` at the boundary — these are used by `handleNodesChange` and `onDrop` above:
+```ts
+// CanvasNode → React Flow Node
+const toFlowNode = (n: CanvasNode): Node => ({
+  id: n.instanceId,
+  type: 'simulation',
+  position: n.position,
+  data: n, // SimulationNode reads display fields (label, status, loadPercent) from here
+})
+
+const toFlowNodes = (nodes: CanvasNode[]): Node[] => nodes.map(toFlowNode)
+
+// React Flow Node[] → CanvasNode[]
+const toCanvasNodes = (nodes: Node[]): CanvasNode[] =>
+  nodes.map((n) => ({ ...(n.data as CanvasNode), position: n.position }))
+```
 
 ### Edge to CanvasEdge conversion
 React Flow uses its own `Edge` type. Convert to/from `CanvasEdge` when calling parent callbacks:
@@ -477,6 +570,9 @@ Before simulation starts, if the user clicks Start and `validateArchitecture` re
 - [ ] `npm run build` passes cleanly
 - [ ] ComponentPalette shows only the components listed in `problem.availableComponents`
 - [ ] Dragging a component from palette onto canvas creates a new node
+- [ ] Dropped node does NOT disappear after a follow-up click, selection, drag-end, or window resize (regression check for the stale-closure node-removal bug)
+- [ ] Dropping a second/third component while earlier nodes remain selected does not remove the earlier nodes
+- [ ] Moving a node and releasing the mouse persists the new position in parent state; dragging in-progress does not spam parent state on every pixel
 - [ ] Connecting two nodes creates a directed edge with an arrow
 - [ ] Deleting a node (select + backspace) removes it from state
 - [ ] ProblemHeader shows correct title, difficulty badge, budget, and timer

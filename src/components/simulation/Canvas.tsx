@@ -13,7 +13,10 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
+  useState,
   type ComponentType,
   type DragEvent,
 } from 'react'
@@ -28,6 +31,7 @@ import {
   ReactFlowProvider,
   addEdge,
   applyEdgeChanges,
+  applyNodeChanges,
   useReactFlow,
   type Connection,
   type Edge,
@@ -53,7 +57,6 @@ import type {
   CanvasEdge,
   CanvasNode,
   ComponentCategory,
-  ComponentDefinition,
 } from '@/types'
 
 interface CanvasProps {
@@ -61,7 +64,7 @@ interface CanvasProps {
   nodes: CanvasNode[]
   /** Edges connecting nodes - managed by parent state */
   edges: CanvasEdge[]
-  /** Called when user drops, moves, or deletes nodes */
+  /** Called with the full node array on real architecture edits */
   onNodesChange: (nodes: CanvasNode[]) => void
   /** Called when user connects or deletes edges */
   onEdgesChange: (edges: CanvasEdge[]) => void
@@ -70,14 +73,8 @@ interface CanvasProps {
 }
 
 interface SimulationNodeData {
-  /** Infrastructure component definition rendered in this node */
-  component: ComponentDefinition
-  /** Current load percentage shown in the node load bar */
-  loadPercent: number
-  /** Whether the load bar should be visible */
-  showLoad: boolean
-  /** Runtime status used for visual state */
-  status: CanvasNode['status']
+  /** Canvas node state rendered by the custom React Flow node */
+  node: CanvasNode
 }
 
 const categoryBorderStyles: Record<ComponentCategory, string> = {
@@ -113,11 +110,14 @@ function loadBarColor(loadPercent: number): string {
  * and a load percentage bar.
  */
 function SimulationNode({ data }: NodeProps<SimulationNodeData>) {
-  const Icon = iconMap[data.component.type]
+  const component = getComponentByType(data.node.type)
+  if (!component) return null
+
+  const Icon = iconMap[component.type]
 
   return (
     <div
-      className={`min-w-[140px] rounded-xl border-2 bg-white p-3 shadow-sm dark:bg-slate-800 ${categoryBorderStyles[data.component.category]}`}
+      className={`min-w-[140px] rounded-xl border-2 bg-white p-3 shadow-sm dark:bg-slate-800 ${categoryBorderStyles[component.category]}`}
     >
       <Handle type="target" position={Position.Left} />
       <div className="flex items-center gap-2">
@@ -125,19 +125,21 @@ function SimulationNode({ data }: NodeProps<SimulationNodeData>) {
           {Icon ? <Icon size={16} /> : null}
         </span>
         <span className="text-sm font-medium text-[var(--text-primary)]">
-          {data.component.label}
+          {component.label}
         </span>
       </div>
-      {data.showLoad ? (
+      {data.node.status !== 'idle' ? (
         <div className="mt-3 flex items-center gap-2">
           <div className="h-1.5 flex-1 rounded-full bg-slate-200 dark:bg-slate-700">
             <div
-              className={`h-1.5 rounded-full ${loadBarColor(data.loadPercent)}`}
-              style={{ width: `${Math.min(100, Math.max(0, data.loadPercent))}%` }}
+              className={`h-1.5 rounded-full ${loadBarColor(data.node.loadPercent)}`}
+              style={{
+                width: `${Math.min(100, Math.max(0, data.node.loadPercent))}%`,
+              }}
             />
           </div>
           <span className="w-8 text-right text-xs text-[var(--text-secondary)]">
-            {Math.round(data.loadPercent)}%
+            {Math.round(data.node.loadPercent)}%
           </span>
         </div>
       ) : null}
@@ -150,8 +152,6 @@ const nodeTypes = {
   simulation: SimulationNode,
 }
 
-const COMPONENT_DRAG_TYPE = 'application/sys-simulation-component'
-
 function toCanvasEdge(edge: Edge): CanvasEdge {
   return {
     id: edge.id,
@@ -160,7 +160,7 @@ function toCanvasEdge(edge: Edge): CanvasEdge {
   }
 }
 
-function toReactFlowNode(node: CanvasNode): Node<SimulationNodeData> | null {
+function toFlowNode(node: CanvasNode): Node<SimulationNodeData> | null {
   const component = getComponentByType(node.type)
   if (!component) return null
 
@@ -168,13 +168,21 @@ function toReactFlowNode(node: CanvasNode): Node<SimulationNodeData> | null {
     id: node.instanceId,
     type: 'simulation',
     position: node.position,
-    data: {
-      component,
-      loadPercent: node.loadPercent,
-      showLoad: node.status !== 'idle',
-      status: node.status,
-    },
+    data: { node },
   }
+}
+
+function toFlowNodes(nodes: CanvasNode[]): Node<SimulationNodeData>[] {
+  return nodes
+    .map(toFlowNode)
+    .filter((node): node is Node<SimulationNodeData> => Boolean(node))
+}
+
+function toCanvasNodes(nodes: Node<SimulationNodeData>[]): CanvasNode[] {
+  return nodes.map((node) => ({
+    ...node.data.node,
+    position: node.position,
+  }))
 }
 
 function toReactFlowEdge(edge: CanvasEdge): Edge {
@@ -186,6 +194,9 @@ function toReactFlowEdge(edge: CanvasEdge): Edge {
   }
 }
 
+/**
+ * CanvasInner - React Flow canvas implementation that owns local node state.
+ */
 function CanvasInner({
   nodes,
   edges,
@@ -194,44 +205,37 @@ function CanvasInner({
   disabled,
 }: CanvasProps) {
   const reactFlowInstance = useReactFlow()
+  const [flowNodes, setFlowNodes] =
+    useState<Node<SimulationNodeData>[]>(() => toFlowNodes(nodes))
+  const flowNodesRef = useRef<Node<SimulationNodeData>[]>(flowNodes)
 
-  const flowNodes = useMemo(
-    () => nodes.map(toReactFlowNode).filter((node): node is Node<SimulationNodeData> => Boolean(node)),
-    [nodes],
-  )
   const flowEdges = useMemo(() => edges.map(toReactFlowEdge), [edges])
+
+  useEffect(() => {
+    if (nodes.length === 0 && flowNodes.length > 0) {
+      flowNodesRef.current = []
+      setFlowNodes([])
+    }
+  }, [flowNodes.length, nodes.length])
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       if (disabled) return
 
-      const hasCanvasStateChange = changes.some(
+      const updated = applyNodeChanges(changes, flowNodesRef.current)
+      flowNodesRef.current = updated
+      setFlowNodes(updated)
+
+      const isArchitectureChange = changes.some(
         (change) =>
           change.type === 'remove' ||
-          (change.type === 'position' && Boolean(change.position)),
+          (change.type === 'position' && change.dragging === false),
       )
-      if (!hasCanvasStateChange) return
+      if (!isArchitectureChange) return
 
-      const removedNodeIds = new Set(
-        changes
-          .filter((change) => change.type === 'remove')
-          .map((change) => change.id),
-      )
-      const positionChanges = new Map<string, CanvasNode['position']>()
-      changes.forEach((change) => {
-        if (change.type === 'position' && change.position) {
-          positionChanges.set(change.id, change.position)
-        }
-      })
-
-      const nextNodes = nodes
-        .filter((node) => !removedNodeIds.has(node.instanceId))
-        .map((node) => {
-          const position = positionChanges.get(node.instanceId)
-          return position ? { ...node, position } : node
-        })
-
+      const nextNodes = toCanvasNodes(updated)
       const keptIds = new Set(nextNodes.map((node) => node.instanceId))
+
       onNodesChange(nextNodes)
       onEdgesChange(
         edges.filter(
@@ -240,7 +244,7 @@ function CanvasInner({
         ),
       )
     },
-    [disabled, edges, nodes, onEdgesChange, onNodesChange],
+    [disabled, edges, onEdgesChange, onNodesChange],
   )
 
   const handleEdgesChange = useCallback(
@@ -276,9 +280,7 @@ function CanvasInner({
       event.preventDefault()
       if (disabled) return
 
-      const componentType =
-        event.dataTransfer.getData(COMPONENT_DRAG_TYPE) ||
-        event.dataTransfer.getData('text/plain')
+      const componentType = event.dataTransfer.getData('componentType')
       if (!componentType) return
 
       const component = getComponentByType(componentType)
@@ -298,9 +300,15 @@ function CanvasInner({
         status: 'idle',
       }
 
-      onNodesChange([...nodes, newNode])
+      const newFlowNode = toFlowNode(newNode)
+      if (!newFlowNode) return
+
+      const updated = [...flowNodesRef.current, newFlowNode]
+      flowNodesRef.current = updated
+      setFlowNodes(updated)
+      onNodesChange(toCanvasNodes(updated))
     },
-    [disabled, nodes, onNodesChange, reactFlowInstance],
+    [disabled, onNodesChange, reactFlowInstance],
   )
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -330,7 +338,8 @@ function CanvasInner({
         <Controls />
         <MiniMap
           nodeColor={(node) => {
-            const status = (node.data as SimulationNodeData | undefined)?.status
+            const status = (node.data as SimulationNodeData | undefined)?.node
+              .status
             if (status === 'warning') return '#fbbf24'
             if (status === 'overloaded') return '#f87171'
             return '#4ade80'
@@ -341,6 +350,9 @@ function CanvasInner({
   )
 }
 
+/**
+ * Canvas - provider wrapper for the React Flow architecture builder.
+ */
 export default function Canvas(props: CanvasProps) {
   return (
     <ReactFlowProvider>
