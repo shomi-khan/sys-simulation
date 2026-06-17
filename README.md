@@ -1,38 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+````markdown
+# sys-simulation
 
-## Getting Started
+> Learn distributed systems by *breaking* them.
 
-First, run the development server:
+**[▶ Play now → sys-simulation.vercel.app](https://sys-simulation.vercel.app/)**
+
+---
+
+Drag a Load Balancer. Connect a Redis cache. Watch your database survive a 10x traffic spike — or melt under pressure.
+
+sys-simulation turns system design from passive reading into an active experiment. Build a real architecture, run a mathematical simulation, and see exactly why your decisions matter.
+
+---
+
+## How to play
+
+1. Pick a challenge
+2. Drag infrastructure components onto the canvas
+3. Connect them into a request flow pipeline
+4. Hit **Start** and watch traffic flow through your system
+5. Read the terminal. Watch the load bars. Don't let your database catch fire.
+
+---
+
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/your-username/sys-simulation
+cd sys-simulation
+npm i && npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [localhost:3000](http://localhost:3000) — you're in.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Add a new challenge
 
-## Learn More
+Create `src/problems/your-challenge.ts`, register it in `src/problems/index.ts`. Done. No engine changes needed.
 
-To learn more about Next.js, take a look at the following resources:
+See `README-DEV.md` for full details on adding problems, components, and scoring profiles.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Built with
 
-## Deploy on Vercel
+Next.js · TypeScript · React Flow · Tailwind CSS · Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-https://sys-simulation.vercel.app/
+*Made for engineers who learn by building, not by reading.*
+````
