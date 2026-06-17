@@ -6,7 +6,9 @@ It is a standalone Next.js application deployed on Vercel.
 Users learn distributed systems by dragging infrastructure components onto a canvas, building architectures, and running a mathematical simulation to observe system behavior.
 
 ## Task
-Create all project config files, folders, and placeholder files with proper comments. Do not implement any logic yet — only structure, types, config skeletons, and project setup files.
+Create all project config files, folders, and placeholder files with proper comments. Do not implement feature logic in this step — only structure, types, config skeletons, and project setup files.
+
+Note: this prompt defines the baseline scaffold. Later prompts may replace placeholders with real implementation and may add feature-specific components.
 
 The project must be ready to run with `npm i && npm run dev` — no CLI scaffolding commands needed.
 
@@ -24,21 +26,22 @@ The project must be ready to run with `npm i && npm run dev` — no CLI scaffold
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
-    "next": "15.3.3",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "next": "16.2.9",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "reactflow": "^11.11.4",
     "lucide-react": "^0.469.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.3.3",
+    "eslint-config-next": "16.2.9",
     "tailwindcss": "^3.4.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
@@ -51,6 +54,7 @@ The project must be ready to run with `npm i && npm run dev` — no CLI scaffold
 ```json
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -61,14 +65,21 @@ The project must be ready to run with `npm i && npm run dev` — no CLI scaffold
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "target": "ES2017"
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }
 ```
@@ -123,51 +134,70 @@ const config = {
 export default config
 ```
 
-### `.eslintrc.json`
-```json
-{
-  "extends": ["next/core-web-vitals", "next/typescript"]
-}
+### `eslint.config.mjs`
+```js
+import { dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { FlatCompat } from '@eslint/eslintrc'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+})
+
+const eslintConfig = [
+  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+]
+
+export default eslintConfig
 ```
 
 ### `.gitignore`
 ```
-# Dependencies
-node_modules/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
 .pnp
-.pnp.js
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
-# Next.js build output
-.next/
-out/
+# testing
+/coverage
 
-# Production build
-build/
-dist/
+# next.js
+/.next/
+/out/
 
-# Environment variables — never commit these
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# production
+/build
 
-# Vercel
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env*
+
+# vercel
 .vercel
 
-# TypeScript
+# typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Editor
-.vscode/
-.idea/
-*.swp
-*.swo
+.cursor
 ```
 
 ### `README.md`
@@ -212,7 +242,7 @@ Open [localhost:3000](http://localhost:3000) — you're in.
 
 Create \`src/problems/your-challenge.ts\`, register it in \`src/problems/index.ts\`. Done. No engine changes needed.
 
-See \`docs/ARCHITECTURAL.md\` for full details on adding problems, components, and scoring profiles.
+See \`README-DEV.md\` for full details on adding problems, components, and scoring profiles.
 
 ---
 
@@ -302,6 +332,7 @@ export default function RootPage() {
 src/
 ├── app/
 │   ├── sys-simulation/
+│   │   ├── layout.tsx                      # Section layout for game routes
 │   │   ├── page.tsx                        # SSR — Challenge list page
 │   │   └── [id]/
 │   │       └── page.tsx                    # CSR — Builder + simulation page
@@ -315,6 +346,8 @@ src/
 │   │   └── Terminal.tsx
 │   └── simulation/                         # Game-specific components
 │       ├── Canvas.tsx
+│       ├── ChallengeCard.tsx
+│       ├── ChallengeGrid.tsx
 │       ├── ComponentPalette.tsx
 │       ├── ReportCard.tsx
 │       └── MobileBlock.tsx
@@ -902,21 +935,24 @@ export {}
 export {}
 ```
 
-### Remaining placeholder files — create with top-level comment only
+### Remaining placeholder files — create with top-level comments where applicable
 
 `src/components/ui/Badge.tsx` — Shared badge component for difficulty labels
 `src/components/ui/Button.tsx` — Shared button with variants
 `src/components/ui/StatCard.tsx` — Displays a single metric (label + value)
 `src/components/ui/Terminal.tsx` — Scrolling log terminal UI
 `src/components/simulation/Canvas.tsx` — React Flow drag-and-drop canvas
+`src/components/simulation/ChallengeCard.tsx` — Challenge list card
+`src/components/simulation/ChallengeGrid.tsx` — Challenge list grid
 `src/components/simulation/ComponentPalette.tsx` — Sidebar with draggable components
 `src/components/simulation/ReportCard.tsx` — Post-simulation result display
 `src/components/simulation/MobileBlock.tsx` — Full-screen mobile warning
+`src/app/sys-simulation/layout.tsx` — Shared layout for game routes
 `src/app/sys-simulation/page.tsx` — SSR challenge list page
 `src/app/sys-simulation/[id]/page.tsx` — CSR builder + simulation page
 
-Each placeholder must have:
-1. A top-level JSDoc comment explaining what the file does and why it exists
+Each placeholder should have:
+1. A top-level JSDoc comment explaining what the file does and why it exists, except files that must begin with directives such as `'use client'`
 2. `export default function` or `export {}` so TypeScript does not complain
 3. No actual implementation
 
@@ -932,5 +968,5 @@ Each placeholder must have:
 - [ ] Root `/` redirects to `/sys-simulation`
 - [ ] All files exist at the paths listed above
 - [ ] No `any` types anywhere
-- [ ] Every file has a top-level comment
+- [ ] Scaffold placeholders have a top-level comment unless a framework directive must come first
 - [ ] `src/types/index.ts` exports all interfaces listed above
