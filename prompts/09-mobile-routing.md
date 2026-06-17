@@ -235,6 +235,18 @@ Layout structure:
 
 ---
 
+## `src/components/simulation/MobileBlock.tsx` — verify and finalize
+
+Ensure the mobile block card has both `w-full` and `max-w-sm`.
+
+```tsx
+<div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-10 dark:border-slate-700 dark:bg-slate-800">
+```
+
+Why: `max-w-sm` alone only caps width; it does not force the card to fill the available mobile container. Without `w-full`, the card can shrink to its content width and look incorrectly narrow.
+
+---
+
 ## `next.config.ts` — verify for Vercel deployment
 
 ```ts
@@ -429,6 +441,7 @@ src/
 ### Mobile
 - [ ] On viewport < 1024px → MobileBlock visible, canvas hidden
 - [ ] On viewport ≥ 1024px → canvas visible, MobileBlock hidden
+- [ ] MobileBlock inner card uses `w-full max-w-sm` so it does not shrink to content width
 
 ### Dark/light
 - [ ] All pages render correctly in system dark mode

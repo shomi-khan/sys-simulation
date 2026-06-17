@@ -16,7 +16,7 @@
 export default function MobileBlock() {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-8 text-center lg:hidden">
-      <div className="max-w-sm rounded-2xl border border-slate-200 bg-white p-10 dark:border-slate-700 dark:bg-slate-800">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-10 dark:border-slate-700 dark:bg-slate-800">
         <div className="mb-6 text-6xl" aria-hidden="true">
           🖥️
         </div>
