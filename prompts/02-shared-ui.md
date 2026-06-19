@@ -1,4 +1,3 @@
-````markdown
 # Step 2 — Shared UI Components
 
 ## Context
@@ -212,4 +211,3 @@ Format: `[{second padded to 2 digits}] {emoji} [{LEVEL}] {message}`
 - [ ] No `any` types
 - [ ] Every prop has an inline comment
 - [ ] Every file has a top-level JSDoc comment
-````

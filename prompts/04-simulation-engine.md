@@ -1,4 +1,3 @@
-````markdown
 # Step 4 — Simulation Engine
 
 ## Context
@@ -801,4 +800,3 @@ export function evaluateSuccessConditions(
 - [ ] No `any` types anywhere
 - [ ] Every function has a JSDoc comment
 - [ ] Complex math blocks have inline comments explaining the reasoning
-````

@@ -1,8 +1,7 @@
-````markdown
 # Step 7 — Simulation Runner (Game Loop, State Management)
 
 ## Context
-You are continuing to build **sys-simulation** — a system design simulation game built with Next.js, TypeScript, and Tailwind CSS.
+You are continuing to build **arch-lab** — a standalone system design simulation game built with Next.js, TypeScript, and Tailwind CSS.
 
 Steps 1–6 are complete. Types, config, shared UI, problem data, engine, challenge list page, and canvas builder all exist.
 
@@ -24,10 +23,11 @@ Now wire up the **simulation runner** — the game loop that drives everything. 
 ## Files to create or update
 
 ```
-src/hooks/useSimulation.ts                        ← new: custom hook — entire game loop lives here
+src/hooks/useSimulation.ts                        ← new: custom hook — entire game loop
 src/app/sys-simulation/[id]/page.tsx              ← update: wire hook into page
-src/components/simulation/Canvas.tsx              ← update: apply node state updates from engine
-src/components/simulation/BuilderSidebar.tsx      ← update: live data flows in
+src/components/simulation/Canvas.tsx              ← update: apply node state from engine
+src/components/simulation/MetricsRow.tsx          ← update: live data flows in
+src/components/simulation/TerminalSidebar.tsx     ← update: live logs flow in
 src/components/simulation/ProblemHeader.tsx       ← update: controls call hook handlers
 ```
 
@@ -42,36 +42,30 @@ src/components/simulation/ProblemHeader.tsx       ← update: controls call hook
  * Custom React hook — owns the entire simulation game loop.
  *
  * WHY THIS EXISTS:
- * The simulation involves a setInterval that fires every second, calls the
- * engine's processTick(), applies node state updates, accumulates tick history,
- * writes log entries, deducts budget, and checks for simulation end conditions.
+ * The simulation involves a setInterval that fires every second, calls
+ * processTick(), applies node state updates, accumulates tick history,
+ * writes log entries, deducts budget, and checks for end conditions.
  *
  * Keeping all of this in a custom hook achieves two things:
- * 1. The builder page component stays clean — it just calls useSimulation()
- *    and gets back handlers and state.
- * 2. The game loop logic is testable and portable — it has no JSX dependencies.
+ * 1. The builder page stays clean — just calls useSimulation() and
+ *    gets back handlers and state.
+ * 2. Game loop logic is portable — no JSX dependencies.
  *
  * STATE MACHINE:
  * idle → running → paused → running → completed
  *                         ↘ reset →  idle
  *
  * STALE CLOSURE STRATEGY:
- * setInterval captures variables at the time the interval is created.
- * If we read canvasNodes/canvasEdges directly inside runTick, we get stale
- * values — the canvas state frozen at the moment Start was clicked.
- *
- * Fix: canvas state is mirrored into a ref (canvasRef) that is always kept
- * in sync with React state. runTick reads from the ref, not from state,
- * so it always sees the latest canvas — even though in practice the canvas
- * cannot change during simulation (blocked by handlers).
- *
- * SimulationState is read via functional setState(prev => ...) — this always
- * gives the latest value regardless of when the interval was created.
+ * setInterval captures variables at creation time — stale closure problem.
+ * Canvas state is mirrored into canvasRef (always kept in sync).
+ * runTick reads from canvasRef.current — always fresh, never stale.
+ * SimulationState is read via functional setState(prev => ...) — always latest.
  *
  * IMPORTANT:
  * - setInterval must be cleared on pause, reset, completion, and unmount.
- * - Canvas structural changes (add/remove nodes) are blocked while running.
+ * - Canvas structural changes blocked while running or paused.
  * - On reset, all simulation state returns to initial values.
+ * - Canvas structure (nodes positions + edges) preserved on reset.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
@@ -83,7 +77,7 @@ import { markSolved } from '@/lib/progress'
 
 /** Everything the builder page needs from the simulation hook */
 export interface UseSimulationReturn {
-  /** Full simulation state — drives sidebar, header, and result display */
+  /** Full simulation state — drives MetricsRow, TerminalSidebar, ResultSummary */
   simState: SimulationState
   /** Current canvas nodes — updated every tick with load state from engine */
   canvasNodes: CanvasNode[]
@@ -97,9 +91,9 @@ export interface UseSimulationReturn {
   handleResume: () => void
   /** Reset everything back to initial state */
   handleReset: () => void
-  /** Update canvas nodes (called by Canvas on drag/drop) — blocked during simulation */
+  /** Update canvas nodes — blocked during simulation */
   handleNodesChange: (nodes: CanvasNode[]) => void
-  /** Update canvas edges (called by Canvas on connect) — blocked during simulation */
+  /** Update canvas edges — blocked during simulation */
   handleEdgesChange: (edges: CanvasState['edges']) => void
   /** Full canvas state — passed to Canvas component */
   canvas: CanvasState
@@ -112,76 +106,71 @@ export interface UseSimulationReturn {
  * @returns Handlers, state, and canvas state for the builder page
  */
 export function useSimulation(problem: Problem): UseSimulationReturn {
-  // ── Canvas state ───────────────────────────────────────────────────────────
+  // ── Canvas state ────────────────────────────────────────────────────────────
   const [canvasNodes, setCanvasNodes] = useState<CanvasNode[]>([])
   const [canvasEdges, setCanvasEdges] = useState<CanvasState['edges']>([])
 
-  // ── Simulation state ───────────────────────────────────────────────────────
+  // ── Simulation state ────────────────────────────────────────────────────────
   const [simState, setSimState] = useState<SimulationState>(() => makeInitialSimState(problem))
 
-  // ── Validation errors ──────────────────────────────────────────────────────
+  // ── Validation errors ───────────────────────────────────────────────────────
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
 
-  // ── Refs ───────────────────────────────────────────────────────────────────
+  // ── Refs ────────────────────────────────────────────────────────────────────
 
   /**
-   * intervalRef holds the setInterval id so we can clear it from anywhere.
-   * Using a ref (not state) prevents the interval id from triggering re-renders.
+   * intervalRef — holds setInterval id so we can clear it from anywhere.
+   * Ref (not state) so clearing the interval never triggers a re-render.
    */
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   /**
-   * canvasRef mirrors canvas state so runTick always reads fresh values.
+   * canvasRef — mirrors canvas state so runTick always reads fresh values.
    *
    * WHY THIS IS NECESSARY:
-   * setInterval creates a closure over variables at the time it is called.
-   * If runTick read canvasNodes/canvasEdges from the closure, it would see
-   * the values from when the interval was created — never updated values.
-   *
-   * By keeping canvasRef in sync with every state change, runTick can
-   * read canvasRef.current and always get the current canvas — no stale data.
-   *
-   * In practice, canvas is blocked from changing during simulation, but
-   * using a ref is still the correct pattern and avoids subtle bugs.
+   * setInterval creates a closure over variables at creation time.
+   * If runTick read canvasNodes directly, it would see the stale value
+   * from when the interval was created — never any updates.
+   * canvasRef.current is mutable — always returns the latest value.
    */
   const canvasRef = useRef<CanvasState>({ nodes: [], edges: [] })
 
   /**
-   * prevCacheHitRatioRef tracks the cache hit ratio from the previous tick.
+   * prevCacheHitRatioRef — tracks cache hit ratio from previous tick.
    * Used by the engine to avoid emitting the same log message every second.
    */
   const prevCacheHitRatioRef = useRef<number>(0)
 
-  // ── Cleanup on unmount ─────────────────────────────────────────────────────
+  // ── Cleanup on unmount ──────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      // Always clear interval when component unmounts — prevents memory leaks
-      // and state updates on unmounted components
+      // Clear interval on unmount — prevents memory leaks and
+      // state updates on unmounted components
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [])
 
-  // ── Clear validation errors when canvas changes ────────────────────────────
+  // ── Clear validation errors when canvas changes ─────────────────────────────
   useEffect(() => {
     if (validationResult) setValidationResult(null)
   }, [canvasNodes, canvasEdges])
 
-  // ── Core tick handler ──────────────────────────────────────────────────────
+  // ── Core tick handler ───────────────────────────────────────────────────────
 
   /**
    * runTick — processes one second of simulation time.
    *
    * Called by setInterval every 1000ms while simulation is running.
    *
-   * WHY WE READ FROM canvasRef NOT canvasNodes:
-   * setInterval captures runTick at creation time. If runTick referenced
-   * canvasNodes directly, it would see the stale value from when the interval
-   * started — never any updates made after that point.
-   * canvasRef.current is a mutable object — always returns the latest value.
+   * WHY canvasRef NOT canvasNodes:
+   * setInterval captures runTick at creation. If runTick referenced
+   * canvasNodes directly, it would always see the value from when
+   * the interval started — stale closure.
+   * canvasRef.current is always the latest canvas — no staleness.
    *
-   * WHY WE USE functional setState FOR simState:
-   * Same stale closure problem. setState(prev => ...) always receives the
-   * latest state as `prev`, regardless of when the interval was created.
+   * WHY functional setState FOR simState:
+   * setState(prev => ...) always receives the latest state as prev,
+   * regardless of when the interval was created.
    */
   const runTick = useCallback(() => {
     setSimState((prev) => {
@@ -193,7 +182,7 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
       // Read canvas from ref — always fresh, never stale
       const canvas = canvasRef.current
 
-      // ── Call the pure engine function ──────────────────────────────────────
+      // ── Call the pure engine function ────────────────────────────────────
       const tickOutput = processTick({
         second: currentSecond,
         canvas,
@@ -205,7 +194,7 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
       // Update cache hit ratio ref for next tick
       prevCacheHitRatioRef.current = tickOutput.metrics.cacheHitRatio
 
-      // ── Apply node state updates from engine to canvas ─────────────────────
+      // ── Apply node state updates from engine to canvas ───────────────────
       setCanvasNodes((prevNodes) =>
         prevNodes.map((node) => {
           const update = tickOutput.updatedNodes.find(
@@ -225,7 +214,7 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
       const newTickHistory = [...prev.tickHistory, tickOutput.metrics]
       const newLogs = [...prev.logs, ...tickOutput.logs]
 
-      // ── Check if simulation has completed ──────────────────────────────────
+      // ── Check simulation completion ──────────────────────────────────────
       const simulationComplete = newElapsed >= problem.durationSeconds
 
       if (simulationComplete) {
@@ -238,29 +227,33 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
         // Calculate final result using all tick history
         const result = calculateResult(newTickHistory, problem, canvas)
 
-        // If the user passed, mark this problem as solved in localStorage
+        // Mark as solved in localStorage if passed
         if (result.passed) {
           markSolved(problem.id)
         }
 
         const completionLog: LogEntry = {
           second: newElapsed,
-          level: 'system',
-          message: `Simulation complete. Final score: ${result.finalScore}/100. ${result.passed ? '✓ Challenge passed!' : '✗ Requirements not met.'}`,
+          level: result.passed ? 'success' : 'critical',
+          message: `simulation complete. score: ${result.finalScore}/100. ${result.passed ? '✓ challenge passed.' : '✗ requirements not met.'}`,
         }
+
+        const xpLog: LogEntry | null = result.passed
+          ? { second: newElapsed, level: 'info', message: `+${result.researchXp} xp earned.` }
+          : null
 
         return {
           ...prev,
           status: 'completed',
           elapsed: newElapsed,
           balance: tickOutput.metrics.balance,
-          logs: [...newLogs, completionLog],
+          logs: xpLog ? [...newLogs, completionLog, xpLog] : [...newLogs, completionLog],
           tickHistory: newTickHistory,
           result,
         }
       }
 
-      // ── Simulation still running — return updated state ────────────────────
+      // ── Simulation still running ─────────────────────────────────────────
       return {
         ...prev,
         elapsed: newElapsed,
@@ -270,33 +263,30 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
       }
     })
   }, [problem])
-  // NOTE: canvasNodes and canvasEdges are intentionally NOT in the dependency
-  // array — runTick reads canvas from canvasRef.current instead to avoid
-  // recreating the interval callback on every canvas change.
+  // NOTE: canvasNodes/canvasEdges intentionally NOT in deps —
+  // runTick reads from canvasRef.current instead to avoid stale closure.
 
-  // ── Control handlers ───────────────────────────────────────────────────────
+  // ── Control handlers ────────────────────────────────────────────────────────
 
   /**
    * handleStart — validates architecture, then begins the game loop.
-   * Shows validation errors if the canvas is not ready.
    */
   const handleStart = useCallback(() => {
     const canvas = canvasRef.current
 
-    // Validate before starting — never run simulation on invalid architecture
+    // Validate before starting — never run on invalid architecture
     const validation = validateArchitecture(canvas)
     if (!validation.valid) {
       setValidationResult(validation)
       return
     }
 
-    // Clear any previous validation errors
     setValidationResult(null)
 
     const startLog: LogEntry = {
       second: 0,
       level: 'system',
-      message: 'Simulation thread initialized. Traffic flowing...',
+      message: 'simulation thread initialized. traffic flowing...',
     }
 
     setSimState((prev) => ({
@@ -305,13 +295,13 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
       logs: [...prev.logs, startLog],
     }))
 
-    // Start the game loop — fires runTick every 1000ms
+    // Start the game loop
     intervalRef.current = setInterval(runTick, 1000)
   }, [runTick])
 
   /**
    * handlePause — suspends the game loop without losing state.
-   * The interval is cleared but elapsed time and tick history are preserved.
+   * Elapsed time and tick history are preserved.
    */
   const handlePause = useCallback(() => {
     if (intervalRef.current) {
@@ -323,7 +313,7 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
       status: 'paused',
       logs: [
         ...prev.logs,
-        { second: prev.elapsed, level: 'system', message: 'Simulation paused.' },
+        { second: prev.elapsed, level: 'system', message: 'simulation paused.' },
       ],
     }))
   }, [])
@@ -338,20 +328,20 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
       status: 'running',
       logs: [
         ...prev.logs,
-        { second: prev.elapsed, level: 'system', message: 'Simulation resumed.' },
+        { second: prev.elapsed, level: 'system', message: 'simulation resumed.' },
       ],
     }))
-    // Restart the interval — runTick picks up from current elapsed via prev.elapsed
+    // Restart interval — runTick picks up from current elapsed via prev.elapsed
     intervalRef.current = setInterval(runTick, 1000)
   }, [runTick])
 
   /**
-   * handleReset — stops simulation and returns everything to initial state.
-   * Canvas structure (nodes + edges) is preserved — user keeps their architecture.
-   * Node load states are reset to idle.
+   * handleReset — stops simulation and returns to initial state.
+   * Canvas structure (node positions + edges) is preserved.
+   * Node load states reset to idle.
    */
   const handleReset = useCallback(() => {
-    // Stop the interval first — always do this before touching state
+    // Stop interval first — always before touching state
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
@@ -370,7 +360,7 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
       })),
     )
 
-    // Sync canvasRef nodes to match reset node states
+    // Sync canvasRef nodes to match reset state
     canvasRef.current = {
       ...canvasRef.current,
       nodes: canvasRef.current.nodes.map((node) => ({
@@ -381,27 +371,24 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
       })),
     }
 
-    // Reset simulation state to initial
     setSimState(makeInitialSimState(problem))
     setValidationResult(null)
   }, [problem])
 
-  // ── Canvas change handlers ─────────────────────────────────────────────────
+  // ── Canvas change handlers ──────────────────────────────────────────────────
 
   /**
    * handleNodesChange — updates canvas node list and syncs canvasRef.
    * Blocked during simulation to prevent structural changes mid-run.
    *
-   * WHY WE SYNC canvasRef HERE:
-   * Every time canvas state changes, we mirror it into canvasRef so that
-   * runTick always has access to the latest canvas without stale closure issues.
+   * WHY SYNC canvasRef:
+   * Every canvas state change is mirrored to canvasRef so runTick
+   * always has access to the latest canvas — stale closure prevention.
    */
   const handleNodesChange = useCallback(
     (nodes: CanvasNode[]) => {
-      // Block structural changes while simulation is active
       if (simState.status === 'running' || simState.status === 'paused') return
       setCanvasNodes(nodes)
-      // Keep ref in sync — runTick reads from here
       canvasRef.current = { ...canvasRef.current, nodes }
     },
     [simState.status],
@@ -413,10 +400,8 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
    */
   const handleEdgesChange = useCallback(
     (edges: CanvasState['edges']) => {
-      // Block structural changes while simulation is active
       if (simState.status === 'running' || simState.status === 'paused') return
       setCanvasEdges(edges)
-      // Keep ref in sync — runTick reads from here
       canvasRef.current = { ...canvasRef.current, edges }
     },
     [simState.status],
@@ -436,11 +421,11 @@ export function useSimulation(problem: Problem): UseSimulationReturn {
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
  * Build the initial SimulationState for a given problem.
- * Extracted to a function so it can be used both on mount and on reset.
+ * Extracted so it can be used on both mount and reset.
  *
  * @param problem - The current challenge
  * @returns Fresh SimulationState with idle status and initial budget
@@ -454,7 +439,7 @@ function makeInitialSimState(problem: Problem): SimulationState {
       {
         second: 0,
         level: 'system',
-        message: 'Initialization complete. Build your architecture and press Start.',
+        message: 'initialization complete. build your architecture and press start.',
       },
     ],
     tickHistory: [],
@@ -467,14 +452,9 @@ function makeInitialSimState(problem: Problem): SimulationState {
 
 ## `src/app/sys-simulation/[id]/page.tsx` — update
 
-Wire `useSimulation` into the page. Replace manual state with hook output:
+Wire `useSimulation` into the page:
 
 ```tsx
-/**
- * Replace existing canvas state and simulation state with the hook.
- * The hook owns all state — the page just connects props to components.
- */
-
 const {
   simState,
   canvasNodes,
@@ -487,8 +467,11 @@ const {
   handleEdgesChange,
   canvas,
 } = useSimulation(problem)
+```
 
-// Pass to ProblemHeader:
+Pass to components:
+
+```tsx
 <ProblemHeader
   problem={problem}
   simStatus={simState.status}
@@ -500,7 +483,11 @@ const {
   onReset={handleReset}
 />
 
-// Pass to Canvas:
+<MetricsRow
+  simState={simState}
+  initialBudget={problem.initialBudget}
+/>
+
 <Canvas
   nodes={canvasNodes}
   edges={canvas.edges}
@@ -509,118 +496,23 @@ const {
   disabled={simState.status === 'running' || simState.status === 'paused'}
 />
 
-// Pass to BuilderSidebar:
-<BuilderSidebar
-  simState={simState}
-  initialBudget={problem.initialBudget}
+<TerminalSidebar
+  logs={simState.logs}
+  simStatus={simState.status}
 />
 
-// Show validation errors above canvas if present:
 {validationResult && !validationResult.valid && (
   <ValidationErrors errors={validationResult.errors} />
 )}
 
-// Show result overlay when completed:
 {simState.status === 'completed' && simState.result && (
-  <ResultOverlay
+  <ResultSummary
     result={simState.result}
     problem={problem}
+    logs={simState.logs}
     onReset={handleReset}
   />
 )}
-```
-
----
-
-## `src/components/simulation/ResultOverlay.tsx` — create (placeholder for Step 8)
-
-```tsx
-/**
- * src/components/simulation/ResultOverlay.tsx
- *
- * Displayed when simulation completes — shows score and pass/fail.
- * Full implementation in Step 8. This placeholder exists so the game
- * loop can be tested end-to-end without waiting for Step 8.
- */
-
-'use client'
-
-import type { SimulationResult, Problem } from '@/types'
-import { Button } from '@/components/ui/Button'
-
-interface ResultOverlayProps {
-  /** The completed simulation result */
-  result: SimulationResult
-  /** The challenge that was just played */
-  problem: Problem
-  /** Called when user clicks Try Again */
-  onReset: () => void
-}
-
-export function ResultOverlay({ result, onReset }: ResultOverlayProps) {
-  return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-sm w-full text-center border border-slate-200 dark:border-slate-700 shadow-xl">
-        <div className="text-5xl mb-4">{result.passed ? '✅' : '❌'}</div>
-        <div className="text-2xl font-bold mb-1">
-          {result.passed ? 'Challenge Passed!' : 'Not Quite'}
-        </div>
-        <div className="text-4xl font-semibold my-4">
-          {result.finalScore}
-          <span className="text-slate-400 text-xl"> / 100</span>
-        </div>
-        {result.passed && (
-          <div className="text-sm text-green-600 dark:text-green-400 mb-4">
-            +{result.researchXp} XP earned
-          </div>
-        )}
-        <Button variant="secondary" onClick={onReset} fullWidth>
-          Try Again
-        </Button>
-      </div>
-    </div>
-  )
-}
-```
-
----
-
-## `src/components/simulation/ValidationErrors.tsx` — create
-
-```tsx
-/**
- * src/components/simulation/ValidationErrors.tsx
- *
- * Displays architecture validation errors above the canvas.
- * Shown when user tries to start simulation with an invalid architecture.
- * Automatically dismissed when canvas changes (handled by useSimulation).
- */
-
-'use client'
-
-import type { ValidationError } from '@/engine/validator'
-
-interface ValidationErrorsProps {
-  /** List of validation errors to display */
-  errors: ValidationError[]
-}
-
-export function ValidationErrors({ errors }: ValidationErrorsProps) {
-  return (
-    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4 text-sm mb-3">
-      <div className="font-medium text-amber-800 dark:text-amber-300 mb-2">
-        ⚠️ Cannot start simulation
-      </div>
-      <ul className="space-y-1">
-        {errors.map((error) => (
-          <li key={error.code} className="text-amber-700 dark:text-amber-400">
-            • {error.message}
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
 ```
 
 ---
@@ -629,22 +521,23 @@ export function ValidationErrors({ errors }: ValidationErrorsProps) {
 
 - [ ] `npm run dev` — no TypeScript errors
 - [ ] `npm run build` — passes cleanly
-- [ ] Dragging components + connecting them, then clicking Start begins simulation
-- [ ] Terminal logs appear every second during simulation
-- [ ] StatCards in sidebar update every second (uptime, latency, req/s, balance)
+- [ ] Drag components + connect → click Start → simulation begins
+- [ ] MetricsRow updates every second (uptime, latency, req/s, balance)
+- [ ] TerminalSidebar logs appear every second
+- [ ] Blinking cursor visible in terminal during running
+- [ ] Blinking cursor stops when paused or completed
 - [ ] Node load bars animate during simulation
-- [ ] Pause stops the timer and interval
-- [ ] Resume continues from where it paused
+- [ ] Load bar: green → amber → red by load%, pulse when critical
+- [ ] Pause stops timer and interval
+- [ ] Resume continues from where paused
 - [ ] Reset clears all simulation state, node load bars return to idle
-- [ ] Canvas drag-and-drop is blocked while simulation is running
+- [ ] Canvas drag-and-drop blocked while running or paused
 - [ ] Simulation ends automatically at `problem.durationSeconds`
-- [ ] On completion: ResultOverlay appears with score and pass/fail
-- [ ] On pass: `markSolved` is called — challenge list shows it as solved after navigation
-- [ ] Clicking Try Again in ResultOverlay resets and returns to builder
-- [ ] Validation errors show when Start is clicked with empty canvas
-- [ ] Validation errors disappear when canvas is modified
-- [ ] No memory leaks — interval is cleared on unmount (verify by navigating away mid-simulation)
-- [ ] No `any` types anywhere
-- [ ] Every function has a JSDoc comment
-- [ ] State transitions have inline comments explaining the reasoning
-````
+- [ ] On completion: ResultSummary overlay appears
+- [ ] On pass: `markSolved` called — challenge list shows solved after navigation
+- [ ] Validation errors show on Start with empty canvas
+- [ ] Validation errors dismiss when canvas changes
+- [ ] No memory leaks — interval cleared on unmount
+- [ ] No `any` types
+- [ ] Every function has JSDoc comment
+- [ ] State transitions have inline comments

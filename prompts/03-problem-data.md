@@ -1,4 +1,3 @@
-````markdown
 # Step 3 — Problem Data Layer
 
 ## Context
@@ -359,4 +358,3 @@ export function getPeakRps(pattern: TrafficPattern): number {
 - [ ] `getRpsAtSecond(pattern, 5)` returns interpolated value correctly
 - [ ] No `any` types anywhere
 - [ ] Every function has a JSDoc comment
-````

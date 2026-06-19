@@ -1,4 +1,3 @@
-````markdown
 # Step 8 — Result Report Page
 
 ## Context
@@ -226,4 +225,3 @@ interface SuccessConditionsProps {
 - [ ] No `any` types anywhere
 - [ ] Every component has a top-level JSDoc comment
 - [ ] Every prop has an inline comment
-````

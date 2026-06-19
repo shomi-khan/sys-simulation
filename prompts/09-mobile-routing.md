@@ -1,4 +1,3 @@
-````markdown
 # Step 9 — Mobile Block, Routing, Final Wiring & Polish
 
 ## Context
@@ -453,4 +452,3 @@ src/
 - [ ] Push to main branch → Vercel deploys successfully
 - [ ] Live URL loads `/sys-simulation` without errors
 - [ ] No console errors on live deployment
-````
