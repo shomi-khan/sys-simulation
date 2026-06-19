@@ -1,14 +1,13 @@
 # Step 1 — Project Scaffold & Folder Structure
 
 ## Context
-You are building a system design simulation game called **sys-simulation**.
-It is a standalone Next.js application deployed on Vercel.
+You are building **arch-lab** — a standalone system design simulation game.
 Users learn distributed systems by dragging infrastructure components onto a canvas, building architectures, and running a mathematical simulation to observe system behavior.
 
-## Task
-Create all project config files, folders, and placeholder files with proper comments. Do not implement feature logic in this step — only structure, types, config skeletons, and project setup files.
+Deployed on **Vercel** as a standalone Next.js application.
 
-Note: this prompt defines the baseline scaffold. Later prompts may replace placeholders with real implementation and may add feature-specific components.
+## Task
+Create all project config files, folders, and placeholder files with proper comments. Do not implement any logic yet — only structure, types, config skeletons, and project setup files.
 
 The project must be ready to run with `npm i && npm run dev` — no CLI scaffolding commands needed.
 
@@ -19,29 +18,28 @@ The project must be ready to run with `npm i && npm run dev` — no CLI scaffold
 ### `package.json`
 ```json
 {
-  "name": "sys-simulation",
+  "name": "arch-lab",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "next lint"
   },
   "dependencies": {
-    "next": "16.2.9",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "next": "15.3.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "reactflow": "^11.11.4",
     "lucide-react": "^0.469.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "15.3.3",
     "tailwindcss": "^3.4.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
@@ -54,7 +52,6 @@ The project must be ready to run with `npm i && npm run dev` — no CLI scaffold
 ```json
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -65,21 +62,14 @@ The project must be ready to run with `npm i && npm run dev` — no CLI scaffold
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "react-jsx",
+    "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"]
-    },
-    "target": "ES2017"
+    }
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }
 ```
@@ -89,7 +79,7 @@ The project must be ready to run with `npm i && npm run dev` — no CLI scaffold
 /**
  * next.config.ts
  *
- * Next.js configuration for sys-simulation.
+ * Next.js configuration for arch-lab.
  * Deployed on Vercel — standard Next.js deployment.
  * No `output: 'export'` needed — Vercel handles SSR natively.
  */
@@ -134,125 +124,51 @@ const config = {
 export default config
 ```
 
-### `eslint.config.mjs`
-```js
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { FlatCompat } from '@eslint/eslintrc'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-})
-
-const eslintConfig = [
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
-]
-
-export default eslintConfig
+### `.eslintrc.json`
+```json
+{
+  "extends": ["next/core-web-vitals", "next/typescript"]
+}
 ```
 
 ### `.gitignore`
 ```
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
+# Dependencies
+node_modules/
 .pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+.pnp.js
 
-# testing
-/coverage
+# Next.js build output
+.next/
+out/
 
-# next.js
-/.next/
-/out/
+# Production build
+build/
+dist/
 
-# production
-/build
+# Environment variables — never commit these
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files
-.env*
-
-# vercel
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
-.cursor
-```
 
-### `README.md`
-```markdown
-# sys-simulation
+# OS
+.DS_Store
+Thumbs.db
 
-> Learn distributed systems by *breaking* them.
-
-**[▶ Play now → sys-simulation.vercel.app](https://sys-simulation.vercel.app/)**
-
----
-
-Drag a Load Balancer. Connect a Redis cache. Watch your database survive a 10x traffic spike — or melt under pressure.
-
-sys-simulation turns system design from passive reading into an active experiment. Build a real architecture, run a mathematical simulation, and see exactly why your decisions matter.
-
----
-
-## How to play
-
-1. Pick a challenge
-2. Drag infrastructure components onto the canvas
-3. Connect them into a request flow pipeline
-4. Hit **Start** and watch traffic flow through your system
-5. Read the terminal. Watch the load bars. Don't let your database catch fire.
-
----
-
-## Run locally
-
-\`\`\`bash
-git clone https://github.com/your-username/sys-simulation
-cd sys-simulation
-npm i && npm run dev
-\`\`\`
-
-Open [localhost:3000](http://localhost:3000) — you're in.
-
----
-
-## Add a new challenge
-
-Create \`src/problems/your-challenge.ts\`, register it in \`src/problems/index.ts\`. Done. No engine changes needed.
-
-See \`README-DEV.md\` for full details on adding problems, components, and scoring profiles.
-
----
-
-## Built with
-
-Next.js · TypeScript · React Flow · Tailwind CSS · Vercel
-
----
-
-*Made for engineers who learn by building, not by reading.*
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
 ```
 
 ### `src/app/globals.css`
@@ -261,46 +177,87 @@ Next.js · TypeScript · React Flow · Tailwind CSS · Vercel
 @tailwind components;
 @tailwind utilities;
 
-/* Dark/light mode via system preference — no toggle needed */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --border: #334155;
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-  }
+/*
+ * globals.css
+ *
+ * Global styles for arch-lab.
+ * Terminal OS aesthetic — dark background always, no light mode.
+ * All color tokens defined here as CSS variables.
+ */
+
+:root {
+  --bg-page:       #0a0f1a;
+  --bg-panel:      #0f172a;
+  --bg-canvas:     #060b14;
+  --bg-log:        #060d0a;
+  --border:        #1e293b;
+  --border-subtle: #131b28;
+  --text-primary:  #e2e8f0;
+  --text-secondary:#94a3b8;
+  --text-muted:    #475569;
+  --text-dim:      #334155;
+  --accent-blue:   #378ADD;
+  --accent-green:  #4ade80;
+  --accent-amber:  #fbbf24;
+  --accent-red:    #ef4444;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --border: #e2e8f0;
-    --text-primary: #0f172a;
-    --text-secondary: #64748b;
-  }
+html, body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Blinking cursor for terminal log */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.cursor-blink {
+  display: inline-block;
+  animation: blink 1s step-end infinite;
+  color: var(--accent-blue);
+}
+
+/* Load bar pulse for critical state */
+@keyframes pulse-critical {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.load-bar-critical {
+  animation: pulse-critical 1s ease-in-out infinite;
 }
 ```
 
 ### `src/app/layout.tsx`
 ```tsx
+/**
+ * src/app/layout.tsx
+ *
+ * Root layout for arch-lab.
+ * Applies monospace font globally — terminal OS aesthetic.
+ */
+
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist_Mono } from 'next/font/google'
 import './globals.css'
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
-const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+})
 
 export const metadata: Metadata = {
-  title: 'sys-simulation',
+  title: 'arch-lab',
   description: 'Learn distributed systems by building and simulating real architectures.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistMono.variable} antialiased`}>
         {children}
       </body>
     </html>
@@ -332,7 +289,6 @@ export default function RootPage() {
 src/
 ├── app/
 │   ├── sys-simulation/
-│   │   ├── layout.tsx                      # Section layout for game routes
 │   │   ├── page.tsx                        # SSR — Challenge list page
 │   │   └── [id]/
 │   │       └── page.tsx                    # CSR — Builder + simulation page
@@ -340,16 +296,13 @@ src/
 │   └── layout.tsx
 ├── components/
 │   ├── ui/                                 # Shared, reusable UI primitives
-│   │   ├── Badge.tsx
 │   │   ├── Button.tsx
 │   │   ├── StatCard.tsx
 │   │   └── Terminal.tsx
 │   └── simulation/                         # Game-specific components
 │       ├── Canvas.tsx
-│       ├── ChallengeCard.tsx
-│       ├── ChallengeGrid.tsx
 │       ├── ComponentPalette.tsx
-│       ├── ReportCard.tsx
+│       ├── ResultSummary.tsx
 │       └── MobileBlock.tsx
 ├── engine/
 │   ├── simulator.ts                        # Core game loop — pure TS, no React
@@ -379,7 +332,7 @@ src/
 /**
  * src/types/index.ts
  *
- * Central type definitions for the sys-simulation game.
+ * Central type definitions for arch-lab.
  * All interfaces, enums, and type aliases live here.
  * No logic. No imports from other src files.
  */
@@ -405,15 +358,14 @@ export type TrafficPattern = TrafficPoint[]
  */
 export interface SuccessCondition {
   metric: 'availability' | 'avgLatency' | 'errorRate' | 'droppedRequests' | 'balance'
-  operator: 'gte' | 'lte'   // gte = greater than or equal, lte = less than or equal
+  operator: 'gte' | 'lte'
   value: number
-  label: string              // Human-readable description shown in UI
+  label: string
 }
 
 /**
  * Named scoring weight profile.
  * Weights must sum to 1.0.
- * Different challenges can reference different profiles.
  */
 export interface ScoringWeights {
   availability: number
@@ -427,44 +379,42 @@ export type ScoringProfile = 'default' | 'costFocused' | 'latencyFocused'
 
 /**
  * Category of an infrastructure component.
- * Used for color-coding borders in the canvas UI.
+ * Used to derive border color at render time — never stored as a color value.
  */
 export type ComponentCategory =
-  | 'network'     // Load Balancer, DNS — blue
-  | 'compute'     // API Server, Worker — green
-  | 'cache'       // Redis — red
-  | 'database'    // SQL, NoSQL — purple
-  | 'cdn'         // CDN — amber
-  | 'queue'       // Message Queue — orange
-  | 'security'    // Rate Limiter — pink
+  | 'network'    // Load Balancer — blue
+  | 'compute'    // API Server — green
+  | 'cache'      // Redis — red
+  | 'database'   // SQL, NoSQL — purple
+  | 'cdn'        // CDN — amber
+  | 'queue'      // Message Queue — orange
+  | 'security'   // Rate Limiter — pink
 
 /**
  * Definition of a draggable infrastructure component.
  * Lives in src/config/components.ts registry.
  */
 export interface ComponentDefinition {
-  type: string                    // unique string id e.g. 'load-balancer'
-  label: string                   // display name e.g. 'Load Balancer'
+  type: string
+  label: string
   icon: string                    // lucide-react icon name
   category: ComponentCategory
-  purchaseCost: number            // one-time cost when placed on canvas
-  runtimeCostPerSecond: number    // deducted from balance every tick
-  capacityRps: number             // max requests per second this component handles
-  basLatencyMs: number            // latency added to request path in ms
-  description: string             // tooltip / info text shown in UI
+  purchaseCost: number
+  runtimeCostPerSecond: number
+  capacityRps: number
+  baseLatencyMs: number
+  description: string
 }
 
 /**
  * A node placed on the canvas by the user.
- * Extends ComponentDefinition with position and runtime state.
  */
 export interface CanvasNode {
-  instanceId: string              // unique id for this placed instance
-  type: string                    // references ComponentDefinition.type
+  instanceId: string
+  type: string
   position: { x: number; y: number }
-  // Runtime state — updated every tick by the engine
   currentLoadRps: number
-  loadPercent: number             // 0-100
+  loadPercent: number             // 0–100
   status: 'idle' | 'healthy' | 'warning' | 'overloaded'
 }
 
@@ -503,15 +453,14 @@ export interface TickMetrics {
   trafficRps: number
   droppedRequests: number
   avgLatencyMs: number
-  errorRate: number               // 0.0 to 1.0
-  cacheHitRatio: number           // 0.0 to 1.0
+  errorRate: number
+  cacheHitRatio: number
   balance: number
   nodeStates: Record<string, { loadPercent: number; status: CanvasNode['status'] }>
 }
 
 /**
  * Aggregated result after the simulation completes.
- * Used to render the result report page.
  */
 export interface SimulationResult {
   challengeId: string
@@ -519,20 +468,19 @@ export interface SimulationResult {
   peakRps: number
   avgLatencyMs: number
   p95LatencyMs: number
-  availability: number            // 0-100
-  errorRate: number               // 0.0 to 1.0
+  availability: number
+  errorRate: number
   cacheHitRatio: number
   droppedRequests: number
   totalInfraCost: number
   finalBalance: number
-  finalScore: number              // 0-100 weighted score
+  finalScore: number
   passed: boolean
-  researchXp: number              // earned XP based on score
+  researchXp: number
 }
 
 /**
  * A single challenge / problem definition.
- * Stored in src/problems/*.ts and registered in src/problems/index.ts
  */
 export interface Problem {
   id: string
@@ -543,23 +491,18 @@ export interface Problem {
   durationSeconds: number
   initialBudget: number
   trafficPattern: TrafficPattern
-  availableComponents: string[]   // list of ComponentDefinition.type values
+  availableComponents: string[]
   successConditions: SuccessCondition[]
   scoringProfile: ScoringProfile
-  /**
-   * ID of the problem that must be solved before this one unlocks.
-   * null = always unlocked (first challenge in the sequence).
-   */
   unlocksAfter: string | null
 }
 
 /**
  * Simulation runtime state managed by React.
- * Passed down to engine functions each tick.
  */
 export interface SimulationState {
   status: 'idle' | 'running' | 'paused' | 'completed'
-  elapsed: number                 // seconds since start
+  elapsed: number
   balance: number
   logs: LogEntry[]
   tickHistory: TickMetrics[]
@@ -628,7 +571,11 @@ export const XP_MULTIPLIER = 5
  * HOW TO ADD A NEW COMPONENT:
  * 1. Add a new entry to the `componentRegistry` array below
  * 2. Add the icon to the iconMap in ComponentPalette.tsx
- * 3. The engine, canvas, and palette will automatically pick it up
+ * 3. The engine, canvas, and palette pick it up automatically
+ *
+ * NOTE: No color values are stored here.
+ * Border color is derived from `category` at render time only.
+ * See ARCHITECTURAL.md §7 for the category → color mapping.
  */
 
 import type { ComponentDefinition } from '@/types'
@@ -636,96 +583,122 @@ import type { ComponentDefinition } from '@/types'
 export const componentRegistry: ComponentDefinition[] = [
   {
     type: 'load-balancer',
-    label: 'Load Balancer',
+    label: 'load balancer',
     icon: 'Network',
     category: 'network',
     purchaseCost: 300,
     runtimeCostPerSecond: 2,
     capacityRps: 5000,
-    basLatencyMs: 2,
+    baseLatencyMs: 2,
     description: 'Distributes incoming traffic evenly across backend servers.',
   },
   {
     type: 'api-server',
-    label: 'API Server',
+    label: 'api server',
     icon: 'Server',
     category: 'compute',
     purchaseCost: 200,
     runtimeCostPerSecond: 3,
     capacityRps: 800,
-    basLatencyMs: 10,
+    baseLatencyMs: 10,
     description: 'Handles business logic. Multiple instances increase throughput.',
   },
   {
     type: 'redis-cache',
-    label: 'Redis Cache',
+    label: 'redis cache',
     icon: 'Zap',
     category: 'cache',
     purchaseCost: 400,
     runtimeCostPerSecond: 2,
     capacityRps: 10000,
-    basLatencyMs: 1,
+    baseLatencyMs: 1,
     description: 'In-memory cache. Reduces database load via high cache hit ratio.',
   },
   {
     type: 'sql-database',
-    label: 'SQL Database',
+    label: 'sql database',
     icon: 'Database',
     category: 'database',
     purchaseCost: 500,
     runtimeCostPerSecond: 4,
     capacityRps: 400,
-    basLatencyMs: 20,
+    baseLatencyMs: 20,
     description: 'Relational database. High consistency, limited write throughput.',
   },
   {
     type: 'nosql-database',
-    label: 'NoSQL Database',
+    label: 'nosql database',
     icon: 'DatabaseZap',
     category: 'database',
     purchaseCost: 500,
     runtimeCostPerSecond: 4,
     capacityRps: 800,
-    basLatencyMs: 15,
+    baseLatencyMs: 15,
     description: 'Document store. Higher throughput than SQL, eventual consistency.',
   },
   {
     type: 'cdn',
-    label: 'CDN',
+    label: 'cdn',
     icon: 'Globe',
     category: 'cdn',
     purchaseCost: 500,
     runtimeCostPerSecond: 3,
     capacityRps: 50000,
-    basLatencyMs: 5,
+    baseLatencyMs: 5,
     description: 'Serves static assets from edge nodes. Dramatically reduces origin load.',
   },
   {
     type: 'message-queue',
-    label: 'Message Queue',
+    label: 'msg queue',
     icon: 'MessageSquare',
     category: 'queue',
     purchaseCost: 350,
     runtimeCostPerSecond: 2,
     capacityRps: 3000,
-    basLatencyMs: 5,
+    baseLatencyMs: 5,
     description: 'Decouples producers from consumers. Absorbs traffic spikes gracefully.',
   },
   {
     type: 'rate-limiter',
-    label: 'Rate Limiter',
+    label: 'rate limiter',
     icon: 'Shield',
     category: 'security',
     purchaseCost: 150,
     runtimeCostPerSecond: 1,
     capacityRps: 10000,
-    basLatencyMs: 1,
+    baseLatencyMs: 1,
     description: 'Throttles abusive clients. Protects downstream services from overload.',
   },
 ]
 
+/**
+ * Helper: look up a component definition by its type string.
+ *
+ * @param type - Component type string e.g. 'load-balancer'
+ * @returns ComponentDefinition or undefined if not found
+ */
 export function getComponentByType(type: string): ComponentDefinition | undefined {
   return componentRegistry.find((c) => c.type === type)
+}
+
+/**
+ * Derive the canvas node border color from a component's category.
+ * Color is never stored — always computed at render time.
+ *
+ * @param category - ComponentCategory value
+ * @returns Hex color string for the node border
+ */
+export function getCategoryColor(category: string): string {
+  const map: Record<string, string> = {
+    network:  '#378ADD',
+    compute:  '#4ade80',
+    cache:    '#f87171',
+    database: '#a78bfa',
+    cdn:      '#fbbf24',
+    queue:    '#fb923c',
+    security: '#f472b6',
+  }
+  return map[category] ?? '#334155'
 }
 ```
 
@@ -752,6 +725,7 @@ export {}
  *
  * Score calculation functions.
  * All functions are pure — same input always produces same output.
+ * Weights injected from src/config/scoring.ts — never hardcoded here.
  * Implemented in Step 4.
  */
 export {}
@@ -763,6 +737,7 @@ export {}
  * src/engine/validator.ts
  *
  * Architecture validation — runs before simulation starts.
+ * Validates the user's canvas forms a valid DAG with a proper request flow.
  * Returns structured validation errors, never throws exceptions.
  * Implemented in Step 4.
  */
@@ -775,6 +750,7 @@ export {}
  * src/hooks/useSimulation.ts
  *
  * Custom React hook — owns the entire simulation game loop.
+ * The builder page calls this hook and gets back handlers and state.
  * Implemented in Step 7.
  */
 export {}
@@ -825,8 +801,8 @@ import type { Problem } from '@/types'
 
 export const urlShortener: Problem = {
   id: 'url-shortener',
-  title: 'URL Shortener',
-  subtitle: 'Handle 100M users with a read-heavy traffic spike.',
+  title: 'url shortener',
+  subtitle: 'handle 100m users with a read-heavy traffic spike.',
   difficulty: 'beginner',
   description: `
     A viral link is being shared across social media.
@@ -851,10 +827,10 @@ export const urlShortener: Problem = {
     'rate-limiter',
   ],
   successConditions: [
-    { metric: 'availability',    operator: 'gte', value: 99,  label: 'Availability ≥ 99%' },
-    { metric: 'avgLatency',      operator: 'lte', value: 100, label: 'Avg latency ≤ 100ms' },
-    { metric: 'droppedRequests', operator: 'lte', value: 0,   label: 'Zero dropped requests' },
-    { metric: 'balance',         operator: 'gte', value: 0,   label: 'Budget not exceeded' },
+    { metric: 'availability',    operator: 'gte', value: 99,  label: 'availability ≥ 99%' },
+    { metric: 'avgLatency',      operator: 'lte', value: 100, label: 'avg latency ≤ 100ms' },
+    { metric: 'droppedRequests', operator: 'lte', value: 0,   label: 'zero dropped requests' },
+    { metric: 'balance',         operator: 'gte', value: 0,   label: 'budget not exceeded' },
   ],
   scoringProfile: 'default',
   unlocksAfter: null,
@@ -874,8 +850,8 @@ import type { Problem } from '@/types'
 
 export const flashSale: Problem = {
   id: 'flash-sale',
-  title: 'Flash Sale',
-  subtitle: 'Survive a 10x traffic spike on a tight budget.',
+  title: 'flash sale',
+  subtitle: 'survive a 10x traffic spike on a tight budget.',
   difficulty: 'medium',
   description: `
     A flash sale just went live. Traffic is about to spike 10x in seconds.
@@ -903,9 +879,9 @@ export const flashSale: Problem = {
     'message-queue',
   ],
   successConditions: [
-    { metric: 'availability',    operator: 'gte', value: 95, label: 'Availability ≥ 95%' },
-    { metric: 'droppedRequests', operator: 'lte', value: 50, label: 'Dropped requests ≤ 50' },
-    { metric: 'balance',         operator: 'gte', value: 0,  label: 'Budget not exceeded' },
+    { metric: 'availability',    operator: 'gte', value: 95, label: 'availability ≥ 95%' },
+    { metric: 'droppedRequests', operator: 'lte', value: 50, label: 'dropped requests ≤ 50' },
+    { metric: 'balance',         operator: 'gte', value: 0,  label: 'budget not exceeded' },
   ],
   scoringProfile: 'costFocused',
   unlocksAfter: 'url-shortener',
@@ -935,24 +911,20 @@ export {}
 export {}
 ```
 
-### Remaining placeholder files — create with top-level comments where applicable
+### Remaining placeholder files — create with top-level comment only
 
-`src/components/ui/Badge.tsx` — Shared badge component for difficulty labels
 `src/components/ui/Button.tsx` — Shared button with variants
 `src/components/ui/StatCard.tsx` — Displays a single metric (label + value)
 `src/components/ui/Terminal.tsx` — Scrolling log terminal UI
 `src/components/simulation/Canvas.tsx` — React Flow drag-and-drop canvas
-`src/components/simulation/ChallengeCard.tsx` — Challenge list card
-`src/components/simulation/ChallengeGrid.tsx` — Challenge list grid
 `src/components/simulation/ComponentPalette.tsx` — Sidebar with draggable components
-`src/components/simulation/ReportCard.tsx` — Post-simulation result display
+`src/components/simulation/ResultSummary.tsx` — Post-simulation result display
 `src/components/simulation/MobileBlock.tsx` — Full-screen mobile warning
-`src/app/sys-simulation/layout.tsx` — Shared layout for game routes
 `src/app/sys-simulation/page.tsx` — SSR challenge list page
 `src/app/sys-simulation/[id]/page.tsx` — CSR builder + simulation page
 
-Each placeholder should have:
-1. A top-level JSDoc comment explaining what the file does and why it exists, except files that must begin with directives such as `'use client'`
+Each placeholder must have:
+1. A top-level JSDoc comment explaining what the file does and why it exists
 2. `export default function` or `export {}` so TypeScript does not complain
 3. No actual implementation
 
@@ -961,12 +933,12 @@ Each placeholder should have:
 ## Verification checklist
 
 - [ ] `npm i` completes without errors
-- [ ] `npm run dev` starts without errors
-- [ ] `npm run build` completes without type errors
-- [ ] `.gitignore` is present — `node_modules/` and `.next/` are excluded
-- [ ] `README.md` is present with live URL
+- [ ] `npm run dev` starts without errors and opens on `http://localhost:3000`
 - [ ] Root `/` redirects to `/sys-simulation`
+- [ ] `npm run build` completes without type errors
+- [ ] `.gitignore` present — `node_modules/` and `.next/` excluded
 - [ ] All files exist at the paths listed above
 - [ ] No `any` types anywhere
-- [ ] Scaffold placeholders have a top-level comment unless a framework directive must come first
+- [ ] Every file has a top-level comment
 - [ ] `src/types/index.ts` exports all interfaces listed above
+- [ ] `getCategoryColor()` returns correct hex for each category

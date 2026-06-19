@@ -1,8 +1,7 @@
-````markdown
 # Step 6 — Canvas Builder Page (Drag-and-Drop, CSR)
 
 ## Context
-You are continuing to build **sys-simulation** — a system design simulation game built with Next.js, TypeScript, and Tailwind CSS.
+You are continuing to build **arch-lab** — a standalone system design simulation game built with Next.js, TypeScript, and Tailwind CSS.
 
 Steps 1–5 are complete. Types, config, shared UI, problem data, engine, and challenge list page all exist.
 
@@ -13,14 +12,14 @@ Now implement the **builder page** at `/sys-simulation/[id]`. This is a fully cl
 ## General rules
 
 - TypeScript only. No `any`.
-- This page is a **Client Component** — `'use client'` at the top of the page file.
+- `'use client'` at the top of the page file.
 - React Flow handles all drag-and-drop and edge connection logic.
 - No simulation logic in this step — just the canvas, palette, and static sidebar.
 - Simulation runner is wired in Step 7.
 - Every component must have a top-level JSDoc comment.
 - Every prop must have an inline comment.
+- **Terminal OS aesthetic** — dark always, monospace everywhere.
 - Mobile: show `MobileBlock`, hide canvas.
-- React Flow `nodeTypes` and `edgeTypes` must be declared at module level, outside component functions. Do not use inline objects or `useMemo` for these type maps.
 
 ---
 
@@ -29,9 +28,29 @@ Now implement the **builder page** at `/sys-simulation/[id]`. This is a fully cl
 ```
 src/app/sys-simulation/[id]/page.tsx              ← CSR builder page
 src/components/simulation/Canvas.tsx              ← React Flow canvas
-src/components/simulation/ComponentPalette.tsx    ← draggable component sidebar
-src/components/simulation/BuilderSidebar.tsx      ← new: right sidebar (stats + terminal placeholder)
-src/components/simulation/ProblemHeader.tsx       ← new: top bar with problem info + controls
+src/components/simulation/ComponentPalette.tsx    ← icon-only palette sidebar
+src/components/simulation/MetricsRow.tsx          ← new: top metrics bar
+src/components/simulation/TerminalSidebar.tsx     ← new: right sidebar (log only)
+src/components/simulation/ProblemHeader.tsx       ← top bar with controls
+```
+
+---
+
+## Layout overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ProblemHeader                                              │
+│  ← challenges · flash sale [medium] · 00:23 · [▶][⏸][↺]  │
+├─────────────────────────────────────────────────────────────┤
+│  MetricsRow                                                 │
+│  uptime · avg latency · req/s · balance  (full width row)   │
+├───────────────┬─────────────────────────┬───────────────────┤
+│ Component     │                         │                   │
+│ Palette       │   React Flow Canvas     │  TerminalSidebar  │
+│ (icon only)   │                         │  (log full height)│
+│ 130px         │   flex-1                │  220px            │
+└───────────────┴─────────────────────────┴───────────────────┘
 ```
 
 ---
@@ -42,43 +61,119 @@ src/components/simulation/ProblemHeader.tsx       ← new: top bar with problem 
 /**
  * src/app/sys-simulation/[id]/page.tsx
  *
- * Builder page — where the user constructs their architecture and runs the simulation.
+ * Builder page — where the user constructs their architecture and runs simulation.
  *
  * WHY CLIENT COMPONENT:
  * React Flow requires browser APIs (drag events, pointer events, ResizeObserver).
- * Simulation state is managed in React state updated every second via setInterval.
- * Neither of these can run on the server.
- *
- * LAYOUT:
- * ┌─────────────────────────────────────────────────────┐
- * │  ProblemHeader (title, difficulty, budget, controls) │
- * ├──────────┬──────────────────────────┬───────────────┤
- * │ Component│                          │               │
- * │ Palette  │     React Flow Canvas    │ BuilderSidebar│
- * │ (left)   │     (center, flex-1)     │ (right)       │
- * └──────────┴──────────────────────────┴───────────────┘
+ * Simulation state runs via setInterval — server cannot run this.
+ * Progress (locked/unlocked) is read from localStorage — browser only.
  */
 ```
 
-### Requirements
-- `'use client'` at top
-- Read `params.id` and look up problem via `getProblemById(id)`
-- If problem not found: render a simple "Challenge not found" message with a back link
-- If problem found but locked (check `isUnlocked`): render "Complete the previous challenge first" with a back link
-- Pass `problem` down to child components as a prop
-- Canvas state (`nodes`, `edges`) lives here as React state — passed to `Canvas` component
-- Simulation state (`SimulationState`) lives here — passed to `BuilderSidebar` and `ProblemHeader`
-- Simulation state initial value:
-  ```ts
-  const initialSimState: SimulationState = {
-    status: 'idle',
-    elapsed: 0,
-    balance: problem.initialBudget,
-    logs: [{ second: 0, level: 'system', message: 'Initialization complete. Build your architecture and press Start.' }],
-    tickHistory: [],
-    result: null,
-  }
-  ```
+### Edge cases to handle
+
+- Problem not found → centered message + back button
+- Problem locked → centered message + back button
+- Problem found + unlocked → full builder
+
+### Not-found state
+```
+// challenge not found
+
+the id you requested does not exist.
+
+← back to challenges
+```
+
+### Locked state
+```
+// challenge locked
+
+complete "{prerequisite title}" first.
+
+← back to challenges
+```
+
+Both states:
+- Background `#0a0f1a`, centered, monospace, dim colors
+- Back button: ghost style, monospace
+
+### Full builder structure
+
+```tsx
+<>
+  {/* mobile block */}
+  <div className="block lg:hidden"><MobileBlock /></div>
+
+  {/* full builder — desktop only */}
+  <div className="hidden lg:flex flex-col h-screen overflow-hidden bg-[#0a0f1a]">
+
+    {/* top bar: title + controls */}
+    <ProblemHeader
+      problem={problem}
+      simStatus={simState.status}
+      balance={simState.balance}
+      elapsed={simState.elapsed}
+      onStart={handleStart}
+      onPause={handlePause}
+      onResume={handleResume}
+      onReset={handleReset}
+    />
+
+    {/* metrics row: full width below header */}
+    <MetricsRow
+      simState={simState}
+      initialBudget={problem.initialBudget}
+    />
+
+    {/* main area: palette + canvas + terminal */}
+    <div className="flex flex-1 overflow-hidden">
+
+      {/* left: component palette */}
+      <div className="w-[130px] flex-shrink-0 border-r border-[#1e293b] overflow-y-auto p-2">
+        <ComponentPalette
+          availableComponents={problem.availableComponents}
+          disabled={simState.status === 'running' || simState.status === 'paused'}
+        />
+      </div>
+
+      {/* center: canvas + validation errors */}
+      <div className="flex-1 flex flex-col relative overflow-hidden">
+        {validationResult && !validationResult.valid && (
+          <ValidationErrors errors={validationResult.errors} />
+        )}
+        <div className="flex-1 relative">
+          <Canvas
+            nodes={canvasNodes}
+            edges={canvas.edges}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
+            disabled={simState.status === 'running' || simState.status === 'paused'}
+          />
+          {/* result overlay when simulation completes */}
+          {simState.status === 'completed' && simState.result && (
+            <ResultSummary
+              result={simState.result}
+              problem={problem}
+              logs={simState.logs}
+              onReset={handleReset}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* right: terminal log — full height */}
+      <div className="w-[220px] flex-shrink-0 border-l border-[#1e293b]">
+        <TerminalSidebar
+          logs={simState.logs}
+          simStatus={simState.status}
+        />
+      </div>
+
+    </div>
+  </div>
+</>
+```
 
 ---
 
@@ -88,13 +183,9 @@ src/components/simulation/ProblemHeader.tsx       ← new: top bar with problem 
 /**
  * src/components/simulation/ProblemHeader.tsx
  *
- * Top bar of the builder page — shows problem context and simulation controls.
- *
- * WHY THIS EXISTS:
- * The user needs to see the problem title, difficulty, remaining budget,
- * elapsed time, and simulation controls (Start/Pause/Resume/Reset) at all
- * times while building. Keeping this in a dedicated component isolates
- * control logic from canvas logic.
+ * Top bar of the builder page.
+ * Shows problem title, difficulty, elapsed timer, and simulation controls.
+ * Controls are always visible — Start/Pause/Resume/Reset depending on status.
  */
 ```
 
@@ -103,11 +194,11 @@ src/components/simulation/ProblemHeader.tsx       ← new: top bar with problem 
 interface ProblemHeaderProps {
   /** The current challenge being played */
   problem: Problem
-  /** Current simulation status — controls which buttons are visible */
+  /** Current simulation status — controls which buttons are shown */
   simStatus: SimulationState['status']
-  /** Remaining budget to display */
+  /** Remaining budget — not shown here, shown in MetricsRow */
   balance: number
-  /** Elapsed simulation seconds */
+  /** Elapsed simulation seconds — shown as MM:SS */
   elapsed: number
   /** Called when user clicks Start */
   onStart: () => void
@@ -122,20 +213,190 @@ interface ProblemHeaderProps {
 
 ### Layout
 ```
-← Back   |   Flash Sale  [Medium]   |   $740 balance   00:12   |   [Pause] [Reset]
+← challenges  |  flash sale  [medium]  |  00:23  |  [▶ start] [⏸ pause] [↺ reset]
 ```
 
-- Left: back arrow link to `/sys-simulation`
-- Center: `problem.title` + `<Badge variant={problem.difficulty} />`
-- Right: balance display + elapsed timer + control buttons
-- Timer format: `MM:SS` — pad with leading zero
-- Balance color: green if > 50% of initial, amber if 20–50%, red if < 20%
-- Button visibility rules:
-  - `idle` → show **Start** (primary)
-  - `running` → show **Pause** (secondary) + **Reset** (ghost)
-  - `paused` → show **Resume** (primary) + **Reset** (ghost)
-  - `completed` → show **Reset** (secondary) only
-- Sticky at top, same style as layout nav bar
+- Background: `#0f172a`
+- Border bottom: `0.5px solid #1e293b`
+- Height: `h-12`
+- Font: monospace, `text-xs`
+- Padding: `px-4`
+- Layout: `flex items-center justify-between`
+
+### Left section
+- `←` link → `/sys-simulation`, color `#475569`, hover `#94a3b8`
+- Separator `|` in `#1e293b`
+- `problem.title` in `#94a3b8`, lowercase
+- Difficulty badge: background + text by difficulty level
+
+### Difficulty badge colors
+| difficulty | bg | text |
+|---|---|---|
+| beginner | `#0d2a0d` | `#4ade80` |
+| easy | `#0a2a20` | `#34d399` |
+| medium | `#2a1f0d` | `#f59e0b` |
+| hard | `#2a1500` | `#fb923c` |
+| expert | `#2a0d0d` | `#ef4444` |
+
+### Right section
+- Timer: `MM:SS` format, color `#475569`
+- Buttons — visibility by status:
+
+| status | buttons |
+|---|---|
+| idle | `▶ start` (primary only) |
+| running | `⏸ pause` + `↺ reset` |
+| paused | `▶ resume` (primary) + `↺ reset` |
+| completed | `↺ reset` only |
+
+### Button styles
+- Primary: `bg-[#0d2a0d] text-[#4ade80] border border-[#1a3a1a]`
+- Ghost: `bg-[#1e293b] text-[#64748b] border border-[#334155]`
+- Size: `px-3 py-1 text-xs rounded-sm font-mono`
+- Hover primary: `hover:bg-[#122e12]`
+- Hover ghost: `hover:bg-[#263244] hover:text-[#94a3b8]`
+
+---
+
+## `src/components/simulation/MetricsRow.tsx` — implement fully
+
+```tsx
+/**
+ * src/components/simulation/MetricsRow.tsx
+ *
+ * Full-width metrics bar below ProblemHeader.
+ * Shows 4 live stats: uptime, avg latency, req/s, balance.
+ *
+ * WHY SEPARATE FROM HEADER:
+ * Header owns navigation and controls.
+ * MetricsRow owns simulation feedback.
+ * Keeping them separate makes each component focused and easier to update.
+ *
+ * In idle state, shows placeholder values.
+ * Updates every tick during simulation via simState prop.
+ */
+```
+
+### Props
+```ts
+interface MetricsRowProps {
+  /** Full simulation state — metrics derived from tickHistory */
+  simState: SimulationState
+  /** Initial budget — used for balance color threshold calculation */
+  initialBudget: number
+}
+```
+
+### Layout
+```
+uptime        avg latency      req/s          balance
+—             —                0              $1,200
+```
+
+- Background: `#0a0f1a`
+- Border bottom: `0.5px solid #1e293b`
+- Grid: `grid grid-cols-4`
+- Each cell: `px-5 py-2 border-r border-[#1e293b] last:border-r-0`
+- Label: `text-[9px] text-[#475569] uppercase tracking-widest mb-1`
+- Value: `text-sm font-medium font-mono`
+
+### Idle values
+| metric | idle value | color |
+|---|---|---|
+| uptime | `—` | `#475569` |
+| avg latency | `—` | `#475569` |
+| req/s | `0` | `#475569` |
+| balance | `$${initialBudget.toLocaleString()}` | `#4ade80` |
+
+### Live value derivation
+```ts
+const latest = simState.tickHistory[simState.tickHistory.length - 1]
+
+// uptime
+const totalReqs = simState.tickHistory.reduce((s, t) => s + t.trafficRps, 0)
+const totalDropped = simState.tickHistory.reduce((s, t) => s + t.droppedRequests, 0)
+const uptime = totalReqs > 0
+  ? ((totalReqs - totalDropped) / totalReqs * 100).toFixed(1) + '%'
+  : '—'
+
+// color thresholds
+// uptime:  ≥99% → #4ade80, ≥95% → #fbbf24, <95% → #ef4444
+// latency: ≤100ms → #4ade80, ≤300ms → #fbbf24, >300ms → #ef4444
+// req/s:   neutral → #94a3b8
+// balance: >50% initial → #4ade80, >20% → #fbbf24, ≤20% → #ef4444
+```
+
+---
+
+## `src/components/simulation/TerminalSidebar.tsx` — implement fully
+
+```tsx
+/**
+ * src/components/simulation/TerminalSidebar.tsx
+ *
+ * Right sidebar — terminal log only, full height.
+ *
+ * WHY LOG ONLY (no stats):
+ * Stats are in MetricsRow above the canvas — always visible.
+ * This sidebar is dedicated entirely to the log narrative,
+ * giving it maximum height and readability.
+ *
+ * The log tells the story of the simulation second by second —
+ * cache hits, overloads, budget warnings, completion.
+ * More log height = more context = better learning.
+ */
+```
+
+### Props
+```ts
+interface TerminalSidebarProps {
+  /** Log entries produced by the engine — appended every tick */
+  logs: LogEntry[]
+  /** Simulation status — controls blinking cursor visibility */
+  simStatus: SimulationState['status']
+}
+```
+
+### Layout
+```
+// log
+──────────────────
+[00:00] ⚙ init complete.
+[00:03] ℹ cache hit 78%.
+[00:08] ⚠ db pool 88%.
+[00:12] ✕ api server 95%.
+[00:18] ✓ stable.
+[00:23] █   ← blink when running
+```
+
+- Background: `#060d0a`
+- Full height: `h-full flex flex-col`
+- Header: `// log` — `text-[9px] text-[#1a3a1a] uppercase tracking-widest px-3 py-2 border-b border-[#0d1f14] flex-shrink-0`
+- Log area: `flex-1 overflow-y-auto px-3 py-2`
+- Auto-scroll to bottom on new entries: `useEffect` + `useRef` on log container
+- Font: monospace, `text-[11px]`, `leading-relaxed`
+
+### Log entry format
+```
+[MM:SS] {message}
+```
+
+| level | color |
+|---|---|
+| system | `#4b5563` |
+| info | `#3b82f6` |
+| warn | `#d97706` |
+| critical | `#ef4444` |
+| success | `#4ade80` |
+
+### Blinking cursor
+```tsx
+{simStatus === 'running' && (
+  <span className="cursor-blink text-[#378ADD]">█</span>
+)}
+```
+- Show only when `running`
+- Remove when `paused`, `completed`, or `idle`
 
 ---
 
@@ -147,16 +408,14 @@ interface ProblemHeaderProps {
  *
  * Left sidebar — displays draggable infrastructure components.
  *
- * WHY THIS EXISTS:
- * The palette is the user's toolbox. It shows only the components available
- * for the current challenge (defined in problem.availableComponents).
- * Restricting available components is part of challenge design — a beginner
- * challenge should not overwhelm the user with 11 options.
+ * ICON-ONLY DESIGN:
+ * Components are distinguished by their lucide-react icon only.
+ * No colored left border. Keeps the palette visually clean
+ * and consistent with the terminal aesthetic.
  *
- * HOW DRAG-AND-DROP WORKS WITH REACT FLOW:
- * Each palette item sets drag data via `event.dataTransfer.setData('componentType', type)`.
- * The Canvas component reads this data in its `onDrop` handler and creates a new node
- * at the drop position. This is the standard React Flow drag-from-outside pattern.
+ * HOW DRAG-AND-DROP WORKS:
+ * Each item sets drag data via event.dataTransfer.setData('componentType', type).
+ * Canvas reads this in its onDrop handler and creates a new node.
  */
 ```
 
@@ -165,51 +424,48 @@ interface ProblemHeaderProps {
 interface ComponentPaletteProps {
   /** Component type strings available for this challenge */
   availableComponents: string[]
-  /** Whether simulation is running — palette is disabled during simulation */
+  /** Disabled during simulation — no dragging allowed */
   disabled: boolean
 }
 ```
 
-### Behavior
-- Filter `componentRegistry` to only show `availableComponents`
-- Each item is draggable: `draggable={true}` + `onDragStart` sets `event.dataTransfer.setData('componentType', component.type)`
-- When `disabled`: show `opacity-50 pointer-events-none` — user cannot drag during simulation
-- Scroll if components overflow: `overflow-y-auto`
-
 ### Item layout
 ```
-┌──────────────────────┐
-│ [icon]  Load Balancer│  ← colored left border by category
-│         $300 · 2/s   │  ← purchaseCost · runtimeCostPerSecond/s
-└──────────────────────┘
+[icon]  load balancer
+        $300 · 2/s
 ```
 
-- Border color by category:
-  - `network` → `border-l-blue-400`
-  - `compute` → `border-l-green-400`
-  - `cache` → `border-l-red-400`
-  - `database` → `border-l-purple-400`
-  - `cdn` → `border-l-amber-400`
-  - `queue` → `border-l-orange-400`
-  - `security` → `border-l-pink-400`
+- Icon: lucide-react, `size={13}`, color `#64748b`
+- Label: `text-[11px] text-[#94a3b8]` lowercase
+- Cost: `text-[10px] text-[#475569]`
+- Background: `#1e293b`
+- Border: `0.5px solid #334155 rounded-sm`
+- Hover: `hover:border-[#475569] hover:bg-[#263244]`
+- Padding: `p-2 gap-2`
+- Disabled: `opacity-50 pointer-events-none`
 
-- Item base: `border-l-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 cursor-grab select-none`
-- Hover: `hover:shadow-sm hover:border-slate-300 dark:hover:border-slate-600`
-- Icon: render lucide-react icon by name — use a dynamic map:
+### Section header
+```
+// components
+```
+`text-[9px] text-[#334155] uppercase tracking-widest mb-2`
 
+### Icon map
 ```ts
-// Map component type → lucide-react icon component
-import { Network, Server, Zap, Database, DatabaseZap, Globe, MessageSquare, Shield } from 'lucide-react'
+import {
+  Network, Server, Zap, Database, DatabaseZap,
+  Globe, MessageSquare, Shield
+} from 'lucide-react'
 
-const iconMap: Record<string, React.ComponentType<{ size?: number }>> = {
-  'load-balancer': Network,
-  'api-server': Server,
-  'redis-cache': Zap,
-  'sql-database': Database,
+const iconMap: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
+  'load-balancer':  Network,
+  'api-server':     Server,
+  'redis-cache':    Zap,
+  'sql-database':   Database,
   'nosql-database': DatabaseZap,
-  'cdn': Globe,
-  'message-queue': MessageSquare,
-  'rate-limiter': Shield,
+  'cdn':            Globe,
+  'message-queue':  MessageSquare,
+  'rate-limiter':   Shield,
 }
 ```
 
@@ -223,178 +479,97 @@ const iconMap: Record<string, React.ComponentType<{ size?: number }>> = {
  *
  * React Flow canvas — the drag-and-drop architecture builder.
  *
- * WHY THIS EXISTS:
- * This is where the user physically constructs their architecture.
- * It renders nodes (infrastructure components) and edges (connections)
- * using React Flow, and handles all drag-and-drop interactions.
+ * CRITICAL — nodeTypes must be at MODULE LEVEL (outside component):
+ * Defining nodeTypes inside the component causes React Flow to
+ * reinitialize the canvas on every render (error #002).
+ * Always define nodeTypes and edgeTypes outside the component function.
  *
  * HOW NODES ARE ADDED:
- * 1. User drags a component from ComponentPalette onto this canvas
- * 2. onDrop fires, reads componentType from dataTransfer
- * 3. A new CanvasNode is created and added to parent state
- * 4. React Flow renders it immediately
+ * 1. User drags from ComponentPalette — sets dataTransfer componentType
+ * 2. onDrop fires — reads componentType, creates CanvasNode at drop position
+ * 3. Parent state updates — React Flow renders new node immediately
  *
- * HOW EDGES ARE ADDED:
- * React Flow handles this natively — user drags from a node's output
- * handle to another node's input handle. onConnect fires with the new edge.
- *
- * NODE VISUAL DESIGN:
- * Each node shows: colored border (by category) + icon + label + load bar.
- * Load bar is hidden when simulation is idle, visible during/after simulation.
+ * LOAD BAR COLOR TRANSITIONS:
+ * green (0–60%) → amber (61–89%) → red (90%+, with pulse animation)
+ * Color is computed at render time from loadPercent — never stored.
  */
 ```
 
 ### Props
 ```ts
 interface CanvasProps {
-  /** Nodes currently on the canvas — managed by parent state */
+  /** Current canvas nodes — managed by parent (useSimulation hook) */
   nodes: CanvasNode[]
-  /** Edges connecting nodes — managed by parent state */
+  /** Current canvas edges — managed by parent */
   edges: CanvasEdge[]
-  /** Called with the full updated node array on any real architecture edit (drop, move-settle, delete) — not on every internal React Flow event */
+  /** Called when user drops a new component or moves an existing node */
   onNodesChange: (nodes: CanvasNode[]) => void
   /** Called when user connects two nodes */
   onEdgesChange: (edges: CanvasEdge[]) => void
-  /** Whether simulation is running — prevents structural changes during sim */
+  /** Blocks structural changes during simulation */
   disabled: boolean
 }
 ```
 
-### React Flow setup
-
-```tsx
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  addEdge,
-  applyNodeChanges,
-  useEdgesState,
-  type Node,
-  type Edge,
-  type NodeChange,
-  type OnConnect,
-  type Connection,
-} from 'reactflow'
-import 'reactflow/dist/style.css'
-```
-
-### Custom node component
-
-Create a `SimulationNode` component inside `Canvas.tsx` (not exported):
-
-```tsx
-/**
- * SimulationNode — custom React Flow node renderer.
- * Renders an infrastructure component with icon, label, category border,
- * and a load percentage bar (visible only during/after simulation).
- */
-```
-
-After defining `SimulationNode`, declare React Flow type maps at module level:
-
-```tsx
-const nodeTypes = {
-  simulation: SimulationNode,
-}
-
-// If custom edge types are added later, keep this module-level too.
-// const edgeTypes = {
-//   custom: CustomEdge,
-// }
-```
-
-Do not write `nodeTypes={{ simulation: SimulationNode }}` inside `<ReactFlow />`.
-React Flow treats inline objects as new references on every render and will warn/re-initialize.
-
-### Local node state & sync with parent (required — fixes node-disappearing bug)
-
-React Flow must own a **local** copy of nodes (`flowNodes`) that drives rendering. This local state is the single source of truth for the canvas. It is synced *out* to parent state (`onNodesChange` prop) only for real architecture edits, and synced *in* from parent state only on external resets (e.g. the Reset button clearing the canvas).
+### SimulationNode — custom node (MODULE LEVEL)
 
 ```ts
-// Local React Flow state — source of truth for what's rendered.
-// Initialized from parent `nodes` prop, then updated locally on every
-// drag/drop/delete via handleNodesChange (defined further below). Pushed
-// back to parent only for real architecture changes — never on every
-// event in React Flow's internal change stream.
-const [flowNodes, setFlowNodes] = useState<Node[]>(toFlowNodes(nodes))
-
-// Re-sync local state from parent ONLY when the parent array was cleared
-// externally (Reset button). Internal-origin updates already match parent
-// state by the time this effect would run, so it's a no-op in that case.
-useEffect(() => {
-  if (nodes.length === 0 && flowNodes.length > 0) {
-    setFlowNodes([])
-  }
-}, [nodes.length])
+// Defined outside Canvas component — stable reference, no re-initialization
+const nodeTypes = { simulationNode: SimulationNode }
 ```
-
-**Why this matters — the bug this prevents:**
-Previously, `onDrop` added a node directly to parent state, but React Flow immediately fires its own internal `onNodesChange` events afterward (dimension measurement, selection). If those internal events were applied via `applyNodeChanges(changes, nodes)` against a **stale** `nodes` closure (captured before the drop's state update had propagated), the result overwrote parent state and silently deleted the just-dropped node. The fix is twofold: (1) keep a local `flowNodes` state that always reflects the latest React Flow changes immediately, and (2) only forward to parent state the change types that represent real architecture edits — never blindly mirror every internal change event.
 
 Node visual:
 ```
-┌─────────────────────────┐  ← colored border (by category)
-│  [icon]  Load Balancer  │  ← icon (16px) + label (text-sm font-medium)
-│  ████░░░░  45%          │  ← load bar + percentage (hidden when idle)
-└─────────────────────────┘
+┌──────────────────────────┐  ← border: 1.5px solid getCategoryColor(category)
+│  [icon 13px]  api server │  ← icon + label text-[11px] lowercase
+│  ████░░  62% · warning   │  ← load bar + status text (hidden when idle)
+└──────────────────────────┘
 ```
 
-- Node size: `min-w-[140px]`
-- Border: `border-2 rounded-xl` — color by category (same mapping as palette)
-- Background: `bg-white dark:bg-slate-800`
-- Load bar colors:
-  - 0–60%: `bg-green-400`
-  - 61–89%: `bg-amber-400`
-  - 90%+: `bg-red-500`
-- Load bar: `h-1.5 rounded-full` inside a `bg-slate-200 dark:bg-slate-700` track
-
-### handleNodesChange — bridges React Flow events to parent state
-
+Load bar color function:
 ```ts
-/**
- * handleNodesChange — wired to <ReactFlow onNodesChange={handleNodesChange}>.
- *
- * Applies every change to local `flowNodes` immediately (so dragging,
- * selection, and resizing stay visually smooth), but only forwards
- * REAL architecture edits to parent state:
- *   - 'position' changes where change.dragging === false (drag has settled)
- *   - 'remove' changes (node deleted)
- * All other change types ('dimensions', 'select', in-progress 'position'
- * with dragging === true) update the local canvas only and are never
- * pushed to parent state. This is what prevents internal React Flow
- * events from overwriting a node that was just added via drop.
- */
-const handleNodesChange = useCallback((changes: NodeChange[]) => {
-  // Always read the freshest state via functional update — never the
-  // `flowNodes` value captured in this callback's closure — so a change
-  // event can never be applied against stale data.
-  setFlowNodes((current) => {
-    const updated = applyNodeChanges(changes, current)
+function getLoadBarColor(loadPercent: number): string {
+  if (loadPercent <= 60) return '#4ade80'
+  if (loadPercent <= 89) return '#fbbf24'
+  return '#ef4444'
+}
+```
 
-    const isArchitectureChange = changes.some(
-      (c) =>
-        (c.type === 'position' && c.dragging === false) ||
-        c.type === 'remove'
-    )
-    if (isArchitectureChange) {
-      onNodesChange(toCanvasNodes(updated))
-    }
+Load bar:
+- Container: `h-1 bg-[#1e293b] rounded-full mt-2`
+- Fill: `h-1 rounded-full transition-all duration-500`
+- Critical: add `load-bar-critical` class (pulse from `globals.css`)
+- Hidden when `status === 'idle'`
 
-    return updated
-  })
-}, [onNodesChange])
+Node styling:
+- Background: `#0f172a`
+- Border: `1.5px solid {getCategoryColor(category)}`
+- Border radius: `rounded-md`
+- Min width: `120px`
+- Padding: `px-3 py-2`
+- Font: monospace
+
+### Canvas container
+- Background: `#060b14`
+- `<Background />`: variant dots, color `#1e293b`, gap 20
+- `<Controls />`: show, dark styled
+- No `<MiniMap />` — too noisy for terminal aesthetic
+
+### Edge styling
+```ts
+const defaultEdgeOptions = {
+  style: { stroke: '#334155', strokeWidth: 1 },
+  markerEnd: { type: MarkerType.ArrowClosed, color: '#475569' },
+}
 ```
 
 ### onDrop handler
-
 ```ts
 const onDrop = useCallback((event: React.DragEvent) => {
   event.preventDefault()
   const componentType = event.dataTransfer.getData('componentType')
   if (!componentType) return
 
-  // Convert drop position from screen coordinates to React Flow canvas coordinates
   const bounds = reactFlowWrapper.current?.getBoundingClientRect()
   if (!bounds) return
 
@@ -403,8 +578,7 @@ const onDrop = useCallback((event: React.DragEvent) => {
     y: event.clientY - bounds.top,
   })
 
-  // Create a new CanvasNode, converted to React Flow's Node shape
-  const newCanvasNode: CanvasNode = {
+  const newNode: CanvasNode = {
     instanceId: `${componentType}-${Date.now()}`,
     type: componentType,
     position,
@@ -412,175 +586,55 @@ const onDrop = useCallback((event: React.DragEvent) => {
     loadPercent: 0,
     status: 'idle',
   }
-  const newFlowNode = toFlowNode(newCanvasNode)
 
-  // Add to LOCAL flowNodes via functional update — reads the freshest
-  // state rather than a possibly-stale `flowNodes`/`nodes` closure — then
-  // push the resulting array to parent state. This, combined with
-  // handleNodesChange ignoring non-architecture changes above, is what
-  // makes the dropped node survive React Flow's follow-up internal events.
-  setFlowNodes((current) => {
-    const updated = [...current, newFlowNode]
-    onNodesChange(toCanvasNodes(updated))
-    return updated
-  })
-}, [onNodesChange, reactFlowInstance])
-```
-
-The drag payload set by `ComponentPalette` must be plain text (`event.dataTransfer.setData('componentType', component.type)`) and read back with `event.dataTransfer.getData('componentType')` — do not use `'application/reactflow'` or JSON-encode the payload; the plain string round-trip is what keeps the drop reliable across browsers.
-
-### Canvas container
-- `ref={reactFlowWrapper}` on the outer div (used only for `getBoundingClientRect()` in `onDrop`'s coordinate conversion)
-- `<ReactFlow>` itself receives `nodes={flowNodes}`, `onNodesChange={handleNodesChange}`, `onDrop={onDrop}`, `onDragOver={(e) => e.preventDefault()}` — **do not** attach `onDrop`/`onDragOver` to the outer wrapper `div`; attaching them to `<ReactFlow>` directly is required for reliable drops (React Flow's own pointer-capture layer can swallow drop events that land on a sibling/parent element instead).
-- Background: `bg-slate-100 dark:bg-slate-900`
-- Show `<Background />`, `<Controls />`, `<MiniMap />` from React Flow
-- MiniMap node color by status:
-  - idle/healthy → `#4ade80`
-  - warning → `#fbbf24`
-  - overloaded → `#f87171`
-
-### Node ↔ CanvasNode conversion
-React Flow uses its own `Node` type. Convert to/from `CanvasNode` at the boundary — these are used by `handleNodesChange` and `onDrop` above:
-```ts
-// CanvasNode → React Flow Node
-const toFlowNode = (n: CanvasNode): Node => ({
-  id: n.instanceId,
-  type: 'simulation',
-  position: n.position,
-  data: n, // SimulationNode reads display fields (label, status, loadPercent) from here
-})
-
-const toFlowNodes = (nodes: CanvasNode[]): Node[] => nodes.map(toFlowNode)
-
-// React Flow Node[] → CanvasNode[]
-const toCanvasNodes = (nodes: Node[]): CanvasNode[] =>
-  nodes.map((n) => ({ ...(n.data as CanvasNode), position: n.position }))
-```
-
-### Edge to CanvasEdge conversion
-React Flow uses its own `Edge` type. Convert to/from `CanvasEdge` when calling parent callbacks:
-```ts
-// React Flow Edge → CanvasEdge
-const toCanvasEdge = (e: Edge): CanvasEdge => ({
-  id: e.id,
-  fromInstanceId: e.source,
-  toInstanceId: e.target,
-})
+  onNodesChange([...nodes, newNode])
+}, [nodes, onNodesChange, reactFlowInstance])
 ```
 
 ---
 
-## `src/components/simulation/BuilderSidebar.tsx` — implement fully
+## `src/components/simulation/ValidationErrors.tsx` — create
 
 ```tsx
 /**
- * src/components/simulation/BuilderSidebar.tsx
+ * src/components/simulation/ValidationErrors.tsx
  *
- * Right sidebar — shows live simulation metrics and the terminal log.
- *
- * WHY THIS EXISTS:
- * During simulation, the user needs real-time feedback: uptime, latency,
- * req/s, and budget. The terminal log provides a narrative of events.
- * Keeping this separate from the canvas avoids cluttering Canvas.tsx
- * with display logic unrelated to drag-and-drop.
- *
- * In Step 6 (this step), the sidebar renders placeholder/zero values.
- * In Step 7, real simulation data flows in via props.
+ * Displays architecture validation errors above the canvas.
+ * Shown when user clicks Start with an invalid architecture.
+ * Dismissed automatically when canvas changes.
  */
 ```
 
-### Props
-```ts
-interface BuilderSidebarProps {
-  /** Current simulation state — drives all displayed values */
-  simState: SimulationState
-  /** Initial budget — used to determine balance color thresholds */
-  initialBudget: number
-}
+Style:
 ```
+// cannot start
 
-### Layout
+• connect your components with arrows to define the request flow.
+• place at least one component on the canvas.
 ```
-┌─────────────────┐
-│ Uptime          │  ← StatCard
-│ 99.8%           │
-├─────────────────┤
-│ Avg Latency     │  ← StatCard
-│ 42ms            │
-├─────────────────┤
-│ Req/s           │  ← StatCard
-│ 1,840           │
-├─────────────────┤
-│ Balance         │  ← StatCard
-│ $740            │
-├─────────────────┤
-│ TERMINAL        │  ← Terminal component (flex-1, fills remaining height)
-│ [00:00] ⚙️ ...  │
-│ [00:03] ℹ️ ...  │
-└─────────────────┘
-```
-
-### Idle state values (before simulation starts)
-- Uptime: `—`
-- Avg Latency: `—`
-- Req/s: `0`
-- Balance: `$${problem.initialBudget.toLocaleString()}`
-- All StatCard status: `neutral`
-
-### Live state values (derive from `simState.tickHistory`)
-```ts
-// Get latest tick metrics
-const latest = simState.tickHistory[simState.tickHistory.length - 1]
-
-// Uptime (availability so far)
-const totalReqs = simState.tickHistory.reduce((s, t) => s + t.trafficRps, 0)
-const totalDropped = simState.tickHistory.reduce((s, t) => s + t.droppedRequests, 0)
-const uptime = totalReqs > 0 ? ((totalReqs - totalDropped) / totalReqs * 100).toFixed(1) + '%' : '—'
-
-// StatCard status thresholds
-// Uptime: >= 99 → healthy, >= 95 → warning, < 95 → critical
-// Latency: <= 100ms → healthy, <= 300ms → warning, > 300ms → critical
-// Balance: > 50% → healthy, > 20% → warning, <= 20% → critical
-```
-
----
-
-## Validation error display
-
-Before simulation starts, if the user clicks Start and `validateArchitecture` returns errors, show them inline above the canvas:
-
-```
-┌──────────────────────────────────────────────────────┐
-│ ⚠️  Cannot start simulation                          │
-│                                                      │
-│ • Connect your components with arrows to define      │
-│   the request flow.                                  │
-│ • Place at least one component on the canvas.        │
-└──────────────────────────────────────────────────────┘
-```
-
-- Style: `bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4 text-sm`
-- Dismisses automatically when user makes a change to the canvas
+- Background: `#1a1200`
+- Border: `0.5px solid #2a1f00`
+- Color: `#d97706`
+- Font: monospace, `text-xs`
+- Padding: `p-3 mx-3 mt-2 rounded-sm`
 
 ---
 
 ## Verification checklist
 
 - [ ] `npm run dev` — `/sys-simulation/url-shortener` loads without errors
-- [ ] `npm run build` passes cleanly
-- [ ] ComponentPalette shows only the components listed in `problem.availableComponents`
-- [ ] Dragging a component from palette onto canvas creates a new node
-- [ ] Dropped node does NOT disappear after a follow-up click, selection, drag-end, or window resize (regression check for the stale-closure node-removal bug)
-- [ ] Dropping a second/third component while earlier nodes remain selected does not remove the earlier nodes
-- [ ] Moving a node and releasing the mouse persists the new position in parent state; dragging in-progress does not spam parent state on every pixel
-- [ ] Connecting two nodes creates a directed edge with an arrow
-- [ ] Deleting a node (select + backspace) removes it from state
-- [ ] ProblemHeader shows correct title, difficulty badge, budget, and timer
-- [ ] Start button visible when idle
-- [ ] Pause/Reset visible when running (wired in Step 7)
-- [ ] BuilderSidebar shows `—` values in idle state
-- [ ] Terminal shows the initialization log message
-- [ ] MobileBlock renders on small screens, builder layout hidden
-- [ ] No `any` types anywhere
+- [ ] `npm run build` — no TypeScript errors
+- [ ] ProblemHeader: title, difficulty badge, timer, correct buttons per status
+- [ ] MetricsRow: 4 columns, placeholder values in idle state
+- [ ] Palette: icon + label + cost, no colored border
+- [ ] Dragging from palette → node appears on canvas at drop position
+- [ ] Node shows icon + label, load bar hidden when idle
+- [ ] Connecting two nodes → directed edge with arrow
+- [ ] Delete node (select + backspace) → removed
+- [ ] `nodeTypes` at module level — no React Flow warning #002
+- [ ] TerminalSidebar: full height, log entries render with correct colors
+- [ ] Blinking cursor in terminal when running (Step 7 will trigger this)
+- [ ] ValidationErrors appear when Start clicked on empty canvas (Step 7)
+- [ ] MobileBlock on small screens, builder hidden
+- [ ] No `any` types
 - [ ] Every component has top-level JSDoc comment
-````

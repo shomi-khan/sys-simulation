@@ -1,12 +1,11 @@
-````markdown
 # Step 5 — Challenge List Page (SSR)
 
 ## Context
-You are continuing to build **sys-simulation** — a system design simulation game built with Next.js, TypeScript, and Tailwind CSS.
+You are continuing to build **arch-lab** — a standalone system design simulation game built with Next.js, TypeScript, and Tailwind CSS.
 
 Steps 1–4 are complete. Types, config, shared UI components, problem data layer, progress tracking, and simulation engine all exist.
 
-Now implement the **challenge list page** at `/sys-simulation`. This is the only SSR page in the project — it must be a React Server Component so search engines can index challenge titles and descriptions.
+Now implement the **challenge list page** at `/sys-simulation`. This is the only SSR page in the project.
 
 ---
 
@@ -17,7 +16,7 @@ Now implement the **challenge list page** at `/sys-simulation`. This is the only
 - Progress state (solved/unlocked) is client-side only — use a Client Component island for that.
 - Every component must have a top-level JSDoc comment.
 - Every prop must have an inline comment.
-- Dark/light via `prefers-color-scheme` — no toggle, no next-themes.
+- **Terminal OS aesthetic** — dark background always, monospace font, no light mode.
 - Mobile: show `MobileBlock` component, hide everything else.
 
 ---
@@ -25,11 +24,10 @@ Now implement the **challenge list page** at `/sys-simulation`. This is the only
 ## Files to create or update
 
 ```
-src/app/sys-simulation/page.tsx          ← SSR page (Server Component)
-src/app/sys-simulation/layout.tsx        ← layout for /sys-simulation routes
-src/components/simulation/MobileBlock.tsx       ← implement fully
-src/components/simulation/ChallengeGrid.tsx     ← new Client Component
-src/components/simulation/ChallengeCard.tsx     ← new Client Component
+src/app/sys-simulation/page.tsx           ← SSR page (Server Component)
+src/app/sys-simulation/layout.tsx         ← layout for /sys-simulation routes
+src/components/simulation/MobileBlock.tsx ← implement fully
+src/components/simulation/ChallengeList.tsx ← new Client Component
 ```
 
 ---
@@ -40,23 +38,26 @@ src/components/simulation/ChallengeCard.tsx     ← new Client Component
 /**
  * src/app/sys-simulation/layout.tsx
  *
- * Layout wrapper for all /sys-simulation routes.
+ * Shared layout for all /sys-simulation routes.
  *
- * WHY THIS EXISTS:
- * Provides consistent page padding, max-width, and the top navigation bar
- * shared between the challenge list page and the builder page.
- * Keeping layout here avoids duplicating it in every page.
+ * IMPORTANT:
+ * The builder page ([id]) needs full viewport height with no extra padding.
+ * The list page controls its own padding via an inner wrapper.
+ * This layout renders children directly — only the nav bar is shared.
  */
 ```
 
-### Requirements
-- Top nav bar with:
-  - Left: game title "sys-simulation" in monospace font + a small subtitle "system design playground"
-  - Right: nothing for MVP (future: XP counter)
-- Below nav: `{children}` with `max-w-6xl mx-auto px-6 py-8`
-- Nav background: `bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-700`
-- Sticky nav: `sticky top-0 z-10`
-- Full page background: `bg-slate-50 dark:bg-slate-900 min-h-screen`
+### Nav bar
+```
+arch-lab  |  system design playground
+```
+- Background: `#0f172a`
+- Border bottom: `0.5px solid #1e293b`
+- Sticky, `z-10`
+- Left: `arch-lab` in accent blue (`#378ADD`) + `system design playground` in dim text
+- Right: empty for MVP
+- Height: `h-12`
+- Font: monospace
 
 ---
 
@@ -66,38 +67,24 @@ src/components/simulation/ChallengeCard.tsx     ← new Client Component
 /**
  * src/components/simulation/MobileBlock.tsx
  *
- * Full-screen message shown on mobile and tablet viewports.
- *
- * WHY THIS EXISTS:
- * The simulation canvas requires drag-and-drop interactions that are
- * impractical on touch screens and small viewports. Rather than showing
- * a broken experience, we show a clear message directing users to desktop.
- *
- * Visibility is controlled by Tailwind breakpoints:
- * - Visible on:  block lg:hidden
- * - Hidden on:   hidden lg:block (applied to the main content by the parent)
+ * Full-screen message shown on mobile and tablet viewports (< 1024px).
+ * The simulation canvas requires drag-and-drop — impractical on touch screens.
+ * Shown via: block lg:hidden on the parent.
  */
 ```
 
 ### Layout
 ```
-┌─────────────────────────────────────────┐
-│                                         │
-│              🖥️                         │
-│                                         │
-│     Best on a desktop browser           │  ← text-xl font-semibold
-│                                         │
-│   This simulation uses drag-and-drop    │  ← text-sm text-secondary
-│   interactions that require a larger    │
-│   screen. Open this page on a laptop    │
-│   or desktop for the full experience.   │
-│                                         │
-└─────────────────────────────────────────┘
-```
+// mobile not supported
 
-- Centered vertically and horizontally: `flex flex-col items-center justify-center min-h-[60vh] text-center px-8`
-- Icon size: `text-6xl mb-6`
-- Card style: subtle border, rounded-2xl, max-w-sm, padding p-10
+open this on a desktop
+browser for the full
+experience.
+```
+- Background: `#0a0f1a`
+- Centered: `flex flex-col items-center justify-center min-h-[60vh] text-center px-8`
+- Font: monospace, muted colors
+- No emoji, no icon — just terminal-style text
 
 ---
 
@@ -107,183 +94,128 @@ src/components/simulation/ChallengeCard.tsx     ← new Client Component
 /**
  * src/app/sys-simulation/page.tsx
  *
- * Challenge list page — entry point of the game.
+ * Challenge list page — entry point of the game. SSR.
  *
  * WHY SSR:
- * Challenge titles, subtitles, and descriptions are static data.
- * Rendering them server-side makes them indexable by search engines,
- * which helps with discoverability as a portfolio piece.
+ * Challenge titles, subtitles, and difficulty are static data.
+ * Rendering server-side makes them indexable by search engines.
  *
- * Progress state (which challenges are solved/unlocked) is stored in
- * localStorage — which only exists in the browser. So we render the
- * challenge grid structure on the server, and hydrate unlock state
- * on the client via the ChallengeGrid Client Component.
+ * Progress state (solved/unlocked) lives in localStorage — browser only.
+ * Passed to ChallengeList (Client Component) after hydration.
  */
 ```
 
-### Requirements
-- Import `problems` from `src/problems/index.ts`
-- Pass problems array to `<ChallengeGrid problems={problems} />`
-- Show `<MobileBlock />` on small screens, `<ChallengeGrid />` on large screens
-- Page title section above the grid:
-  ```
-  System Design Challenges          ← text-2xl font-bold
-  Build. Simulate. Learn.           ← text-sm text-secondary mt-1
-  ```
-- Next.js metadata export:
-  ```ts
-  export const metadata = {
-    title: 'System Design Challenges — sys-simulation',
-    description: 'Learn distributed systems by building and simulating real architectures.',
-  }
-  ```
+### Metadata
+```ts
+export const metadata = {
+  title: 'arch-lab — system design challenges',
+  description: 'Learn distributed systems by building and simulating real architectures.',
+}
+```
+
+### Layout
+```
+// challenges
+
+▶  url shortener       beginner   ✓ solved
+▶  flash sale          medium     — unsolved
+🔒 real-time chat      hard       locked
+🔒 video streaming     expert     locked
+
+2/4 solved · next: flash sale █
+```
+
+- Page padding: `max-w-3xl mx-auto px-6 py-10`
+- Section header: `// challenges` in dim color, `text-xs uppercase tracking-widest`
+- Pass `problems` array to `<ChallengeList problems={problems} />`
+- Show `<MobileBlock />` on small screens (`block lg:hidden`)
+- Show list on large screens (`hidden lg:block`)
 
 ---
 
-## `src/components/simulation/ChallengeGrid.tsx` — implement fully
+## `src/components/simulation/ChallengeList.tsx` — implement fully
 
 ```tsx
 /**
- * src/components/simulation/ChallengeGrid.tsx
+ * src/components/simulation/ChallengeList.tsx
  *
- * Client Component — renders the challenge card grid with unlock state.
+ * Client Component — renders the challenge list with unlock/solved state.
  *
  * WHY CLIENT COMPONENT:
- * Unlock state is derived from localStorage (via src/lib/progress.ts).
- * localStorage is only available in the browser, so this component must
- * be a Client Component. The Server Component page passes problem data
- * down as props — no data fetching happens here.
- *
- * On first render, all challenges appear locked (SSR-safe default).
- * After hydration, useEffect reads localStorage and updates unlock state.
+ * Unlock and solved state come from localStorage — browser only.
+ * On first render (SSR-safe), all challenges appear locked.
+ * After hydration, useEffect reads localStorage and updates state.
  * This prevents hydration mismatch errors.
  */
 ```
 
 ### Props
 ```ts
-interface ChallengeGridProps {
-  /** All problems passed down from the SSR page — never fetched client-side */
+interface ChallengeListProps {
+  /** All problems passed from SSR page — never fetched client-side */
   problems: Problem[]
 }
 ```
 
-### Behavior
-- `'use client'` at top
-- On mount (`useEffect`), read solved ids from `getSolvedIds()` and compute which problems are unlocked via `isUnlocked()`
-- Before hydration (initial render), treat all problems as locked — avoids SSR mismatch
-- Grid layout: `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4`
-- Render one `<ChallengeCard />` per problem
-
-### Unlock logic
-```ts
-// A problem is unlocked if:
-// 1. It has no prerequisite (unlocksAfter === null), OR
-// 2. Its prerequisite id exists in the solved set
-const unlocked = problem.unlocksAfter === null || solvedIds.has(problem.unlocksAfter)
+### Row layout
+```
+[prefix]  [title]                [difficulty]   [status]
 ```
 
----
+Each row is a `grid` with columns: `20px 1fr 80px 80px`
 
-## `src/components/simulation/ChallengeCard.tsx` — implement fully
+| field | solved+unlocked | unlocked unsolved | locked |
+|---|---|---|---|
+| prefix | `▶` green | `▶` amber/red by difficulty | `🔒` dim |
+| title | `#e2e8f0` | `#e2e8f0` | `#475569` |
+| difficulty | color by level | color by level | `#334155` |
+| status | `✓ solved` green | `— unsolved` dim | `locked` dim |
 
-```tsx
-/**
- * src/components/simulation/ChallengeCard.tsx
- *
- * Displays a single challenge as a clickable card.
- *
- * States:
- * - Unlocked: clickable, navigates to /sys-simulation/[id]
- * - Locked: not clickable, shows lock icon + "Complete previous challenge" tooltip
- * - Solved: shows a checkmark badge in addition to normal state
- *
- * WHY SEPARATE COMPONENT:
- * Isolates the card's visual logic from the grid layout.
- * Makes it easy to change card design without touching grid logic.
- */
-```
-
-### Props
-```ts
-interface ChallengeCardProps {
-  /** The problem data to display */
-  problem: Problem
-  /** Whether this challenge is available to play */
-  unlocked: boolean
-  /** Whether this challenge has already been completed */
-  solved: boolean
-}
-```
-
-### Card layout
-```
-┌──────────────────────────────────────┐
-│ [Beginner]              [✓ Solved]   │  ← Badge row (difficulty + solved badge)
-│                                      │
-│ URL Shortener                        │  ← title: text-base font-semibold
-│ Handle 100M users with read-heavy    │  ← subtitle: text-sm text-secondary mt-1
-│ traffic spike.                       │
-│                                      │
-│ 45s  ·  $1,200 budget                │  ← meta: text-xs text-secondary mt-3
-│                         →            │  ← arrow icon (only when unlocked)
-└──────────────────────────────────────┘
-```
-
-### Locked state
-```
-┌──────────────────────────────────────┐
-│ [Medium]                      🔒     │
-│                                      │
-│ Flash Sale                           │
-│ Survive a 10x traffic spike...       │
-│                                      │
-│ Complete "URL Shortener" to unlock   │  ← text-xs text-secondary italic
-└──────────────────────────────────────┘
-```
-
-### Styling rules
-- Card base: `rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5`
-- Unlocked + hover: `cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all duration-150`
-- Locked: `opacity-60 cursor-not-allowed`
-- Solved: add a subtle `ring-1 ring-green-400 dark:ring-green-500` to the card border
-- On click (unlocked only): `router.push('/sys-simulation/' + problem.id)`
-- Use `useRouter` from `next/navigation`
-
-### Meta row content
-- Duration: `{problem.durationSeconds}s`
-- Budget: `$${problem.initialBudget.toLocaleString()} budget`
-- Separator: ` · `
-
----
-
-## Color category border mapping
-
-Component category → left border accent on card (optional visual touch):
-
-| difficulty | left border color |
+### Difficulty color mapping
+| difficulty | color |
 |---|---|
-| beginner | border-l-4 border-l-green-400 |
-| easy | border-l-4 border-l-teal-400 |
-| medium | border-l-4 border-l-amber-400 |
-| hard | border-l-4 border-l-orange-400 |
-| expert | border-l-4 border-l-red-400 |
+| beginner | `#4ade80` |
+| easy | `#34d399` |
+| medium | `#f59e0b` |
+| hard | `#fb923c` |
+| expert | `#ef4444` |
+
+### Row behavior
+- Unlocked row: `cursor-pointer` — on click, `router.push('/sys-simulation/' + problem.id)`
+- Locked row: `opacity-40 cursor-not-allowed` — no click handler
+- Hover on unlocked: `hover:bg-[#0f172a]` subtle background
+
+### Row styling
+- Each row: `grid grid-cols-[20px_1fr_80px_80px] items-center gap-4 px-3 py-3 rounded-md`
+- Separator between rows: `border-b border-[#131b28]` on all but last
+- Font size: `text-xs` throughout
+
+### Footer line
+After all rows:
+```
+{solvedCount}/{total} solved · next: {nextChallenge.title} █
+```
+- `█` uses `cursor-blink` CSS class from `globals.css`
+- If all solved: `all challenges complete █`
+- Color: `#334155` for text, `#378ADD` for cursor
+- Show only after hydration (avoid SSR mismatch)
 
 ---
 
 ## Verification checklist
 
 - [ ] `npm run dev` — `/sys-simulation` loads without errors
-- [ ] `npm run build` passes cleanly with no TypeScript errors
-- [ ] Page title and subtitle render correctly
-- [ ] Both challenge cards render with correct title, subtitle, difficulty badge
-- [ ] URL Shortener card is unlocked and clickable
-- [ ] Flash Sale card is locked with lock icon and prerequisite message
-- [ ] Clicking URL Shortener navigates to `/sys-simulation/url-shortener`
-- [ ] MobileBlock renders on small viewports, grid hidden
-- [ ] Grid renders on large viewports, MobileBlock hidden
+- [ ] `npm run build` — no TypeScript errors
+- [ ] Nav bar renders with correct colors and font
+- [ ] All challenge rows render with correct title, difficulty, status
+- [ ] URL Shortener row is unlocked and clickable
+- [ ] Flash Sale row shows as unsolved but unlocked after url-shortener solved
+- [ ] Locked rows are dimmed and not clickable
+- [ ] Clicking unlocked row navigates to `/sys-simulation/[id]`
+- [ ] Footer line shows correct solved count and next challenge
+- [ ] Blinking cursor appears in footer
+- [ ] MobileBlock renders on small viewports
+- [ ] List hidden on small viewports
 - [ ] No hydration mismatch errors in browser console
-- [ ] No `any` types anywhere
+- [ ] No `any` types
 - [ ] Every component has top-level JSDoc comment
-- [ ] Every prop has inline comment
-````
