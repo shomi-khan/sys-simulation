@@ -214,7 +214,7 @@ export function processTick(input: TickInput): TickOutput {
       totalCacheHitRps += cacheHitRps
     }
 
-    const latencyMs = calculateEffectiveLatency(componentDef.basLatencyMs, loadPercent)
+    const latencyMs = calculateEffectiveLatency(componentDef.baseLatencyMs, loadPercent)
     totalLatencyMs += latencyMs
     pathLength++
 

@@ -26,7 +26,7 @@ export const componentRegistry: ComponentDefinition[] = [
     purchaseCost: 300,
     runtimeCostPerSecond: 2,
     capacityRps: 5000,
-    basLatencyMs: 2,
+    baseLatencyMs: 2,
     description: 'Distributes incoming traffic evenly across backend servers.',
   },
   {
@@ -37,7 +37,7 @@ export const componentRegistry: ComponentDefinition[] = [
     purchaseCost: 200,
     runtimeCostPerSecond: 3,
     capacityRps: 800,
-    basLatencyMs: 10,
+    baseLatencyMs: 10,
     description: 'Handles business logic. Multiple instances increase throughput.',
   },
   {
@@ -48,7 +48,7 @@ export const componentRegistry: ComponentDefinition[] = [
     purchaseCost: 400,
     runtimeCostPerSecond: 2,
     capacityRps: 10000,
-    basLatencyMs: 1,
+    baseLatencyMs: 1,
     description: 'In-memory cache. Reduces database load via high cache hit ratio.',
   },
   {
@@ -59,7 +59,7 @@ export const componentRegistry: ComponentDefinition[] = [
     purchaseCost: 500,
     runtimeCostPerSecond: 4,
     capacityRps: 400,
-    basLatencyMs: 20,
+    baseLatencyMs: 20,
     description: 'Relational database. High consistency, limited write throughput.',
   },
   {
@@ -70,7 +70,7 @@ export const componentRegistry: ComponentDefinition[] = [
     purchaseCost: 500,
     runtimeCostPerSecond: 4,
     capacityRps: 800,
-    basLatencyMs: 15,
+    baseLatencyMs: 15,
     description: 'Document store. Higher throughput than SQL, eventual consistency.',
   },
   {
@@ -81,7 +81,7 @@ export const componentRegistry: ComponentDefinition[] = [
     purchaseCost: 500,
     runtimeCostPerSecond: 3,
     capacityRps: 50000,
-    basLatencyMs: 5,
+    baseLatencyMs: 5,
     description: 'Serves static assets from edge nodes. Dramatically reduces origin load.',
   },
   {
@@ -92,7 +92,7 @@ export const componentRegistry: ComponentDefinition[] = [
     purchaseCost: 350,
     runtimeCostPerSecond: 2,
     capacityRps: 3000,
-    basLatencyMs: 5,
+    baseLatencyMs: 5,
     description: 'Decouples producers from consumers. Absorbs traffic spikes gracefully.',
   },
   {
@@ -103,7 +103,7 @@ export const componentRegistry: ComponentDefinition[] = [
     purchaseCost: 150,
     runtimeCostPerSecond: 1,
     capacityRps: 10000,
-    basLatencyMs: 1,
+    baseLatencyMs: 1,
     description: 'Throttles abusive clients. Protects downstream services from overload.',
   },
 ]
@@ -114,4 +114,24 @@ export const componentRegistry: ComponentDefinition[] = [
  */
 export function getComponentByType(type: string): ComponentDefinition | undefined {
   return componentRegistry.find((c) => c.type === type)
+}
+
+/**
+ * Derive the canvas node border color from a component's category.
+ * Color is never stored — always computed at render time.
+ *
+ * @param category - ComponentCategory value
+ * @returns Hex color string for the node border
+ */
+export function getCategoryColor(category: string): string {
+  const map: Record<string, string> = {
+    network:  '#378ADD',
+    compute:  '#4ade80',
+    cache:    '#f87171',
+    database: '#a78bfa',
+    cdn:      '#fbbf24',
+    queue:    '#fb923c',
+    security: '#f472b6',
+  }
+  return map[category] ?? '#334155'
 }

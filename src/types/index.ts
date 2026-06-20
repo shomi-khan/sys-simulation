@@ -72,7 +72,7 @@ export interface ComponentDefinition {
   purchaseCost: number            // one-time cost when placed on canvas
   runtimeCostPerSecond: number    // deducted from balance every tick
   capacityRps: number             // max requests per second this component handles
-  basLatencyMs: number            // latency added to request path in ms
+  baseLatencyMs: number           // latency added to request path in ms
   description: string             // tooltip / info text shown in UI
 }
 
