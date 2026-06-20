@@ -1,10 +1,10 @@
-# sys-simulation
+# arch-puzzle
 
 An interactive system design simulation game. Build distributed architectures
 using drag-and-drop, then run a mathematical simulation to see how your system
 performs under real traffic.
 
-Live: [sys-simulation.vercel.app](https://sys-simulation.vercel.app/)
+Live: [arch-puzzle.vercel.app](https://arch-puzzle.vercel.app/)
 
 ---
 
@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000/sys-simulation](http://localhost:3000/sys-simulation)
+Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
