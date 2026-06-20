@@ -58,7 +58,7 @@ export default function ChallengeList({ problems }: ChallengeListProps) {
 
           const handleClick = () => {
             if (unlocked) {
-              router.push(`/sys-simulation/${problem.id}`)
+              router.push(`/${problem.id}`)
             }
           }
 

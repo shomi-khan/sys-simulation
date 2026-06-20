@@ -76,7 +76,7 @@ export default function BuilderPage({ params }: BuilderPageProps) {
           </p>
           <Button
             variant="ghost"
-            onClick={() => router.push('/sys-simulation')}
+            onClick={() => router.push('/')}
           >
             ← back to challenges
           </Button>
@@ -109,7 +109,7 @@ export default function BuilderPage({ params }: BuilderPageProps) {
           </p>
           <Button
             variant="ghost"
-            onClick={() => router.push('/sys-simulation')}
+            onClick={() => router.push('/')}
           >
             ← back to challenges
           </Button>

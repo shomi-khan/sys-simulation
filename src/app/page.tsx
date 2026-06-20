@@ -1,12 +1,40 @@
 /**
- * src/app/page.tsx
+ * src/app/sys-simulation/page.tsx
  *
- * Root page - redirects to /sys-simulation.
- * Keeps the root URL clean and forwards visitors to the game.
+ * Challenge list page - entry point of the game. SSR.
+ *
+ * WHY SSR:
+ * Challenge titles, subtitles, and difficulty are static data.
+ * Rendering server-side makes them indexable by search engines.
+ *
+ * Progress state (solved/unlocked) lives in localStorage — browser only.
+ * Passed to ChallengeList (Client Component) after hydration.
  */
 
-import { redirect } from 'next/navigation'
+import ChallengeList from '@/components/simulation/ChallengeList'
+import MobileBlock from '@/components/simulation/MobileBlock'
+import { problems } from '@/problems'
 
-export default function RootPage() {
-  redirect('/sys-simulation')
+export const metadata = {
+  title: 'arch-lab — system design challenges',
+  description: 'Learn distributed systems by building and simulating real architectures.',
+}
+
+/**
+ * SysSimulationPage - renders the desktop challenge list and mobile block.
+ */
+export default function SysSimulationPage() {
+  return (
+    <>
+      <MobileBlock />
+      <div className="hidden max-w-3xl mx-auto px-6 py-10 lg:block" style={{ backgroundColor: '#0a0f1a' }}>
+        <header className="mb-6">
+          <h2 className="font-mono text-xs uppercase tracking-widest" style={{ color: '#334155', marginBottom: '1rem' }}>
+            // challenges
+          </h2>
+        </header>
+        <ChallengeList problems={problems} />
+      </div>
+    </>
+  )
 }

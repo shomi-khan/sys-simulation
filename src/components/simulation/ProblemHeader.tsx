@@ -80,7 +80,7 @@ export default function ProblemHeader({
       {/* Left section */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <Link
-          href="/sys-simulation"
+          href="/"
           style={{
             color: '#475569',
             textDecoration: 'none',
