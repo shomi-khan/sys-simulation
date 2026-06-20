@@ -27,18 +27,17 @@ export default function SysSimulationLayout({
   children,
 }: SysSimulationLayoutProps) {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <nav className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-700 dark:bg-slate-900/80">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-          <div>
-            <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">
-              sys-simulation
-            </span>
-            <span className="ml-2 hidden text-xs text-slate-400 sm:inline">
-              system design playground
-            </span>
-          </div>
-        </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#0a0f1a' }}>
+      <nav
+        className="sticky top-0 z-10 flex h-12 items-center px-6 font-mono"
+        style={{ backgroundColor: '#0f172a', borderBottom: '0.5px solid #1e293b' }}
+      >
+        <span className="text-sm font-semibold" style={{ color: '#378ADD' }}>
+          arch-lab
+        </span>
+        <span className="ml-2 text-xs" style={{ color: '#475569' }}>
+          system design playground
+        </span>
       </nav>
       {children}
     </div>
