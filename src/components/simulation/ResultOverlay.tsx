@@ -92,7 +92,7 @@ export function ResultOverlay({
           </Button>
           <Button
             variant="ghost"
-            onClick={() => router.push('/sys-simulation')}
+            onClick={() => router.push('/')}
             className="flex-1"
           >
             Back to Challenges

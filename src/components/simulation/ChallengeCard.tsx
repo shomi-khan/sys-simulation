@@ -6,7 +6,7 @@
  * Displays a single challenge as a clickable card.
  *
  * States:
- * - Unlocked: clickable, navigates to /sys-simulation/[id]
+ * - Unlocked: clickable, navigates to /[id]
  * - Locked: not clickable, shows lock icon and prerequisite guidance
  * - Solved: shows a checkmark badge in addition to normal state
  *
@@ -48,7 +48,7 @@ export default function ChallengeCard({
 
   function handleClick() {
     if (unlocked) {
-      router.push(`/sys-simulation/${problem.id}`)
+      router.push(`/${problem.id}`)
     }
   }
 

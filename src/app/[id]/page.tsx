@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * src/app/sys-simulation/[id]/page.tsx
+ * src/app/[id]/page.tsx
  *
  * Builder page — where the user constructs their architecture and runs simulation.
  *

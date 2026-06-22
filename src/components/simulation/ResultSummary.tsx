@@ -185,7 +185,7 @@ export default function ResultSummary({
             {result.passed && (
               <button
                 type="button"
-                onClick={() => router.push('/sys-simulation')}
+                onClick={() => router.push('/')}
                 className="px-3 py-1 text-xs rounded-sm font-mono bg-[#0d2a0d] text-[#4ade80] border border-[#1a3a1a]"
               >
                 ▶ next challenge
@@ -200,7 +200,7 @@ export default function ResultSummary({
             </button>
             <button
               type="button"
-              onClick={() => router.push('/sys-simulation')}
+              onClick={() => router.push('/')}
               className="px-3 py-1 text-xs rounded-sm font-mono bg-[#1e293b] text-[#64748b] border border-[#334155]"
             >
               ← back to list

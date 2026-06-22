@@ -1,5 +1,5 @@
 /**
- * src/app/sys-simulation/[id]/loading.tsx
+ * src/app/[id]/loading.tsx
  *
  * Loading state for the challenge builder route while route params resolve.
  */

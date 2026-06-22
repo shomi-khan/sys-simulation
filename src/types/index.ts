@@ -157,7 +157,7 @@ export interface SimulationResult {
  * Stored in src/problems/*.ts and registered in src/problems/index.ts
  */
 export interface Problem {
-  /** Unique string identifier — used in URLs e.g. /sys-simulation/url-shortener */
+  /** Unique string identifier — used in URLs e.g. /url-shortener */
   id: string
 
   /** Display title shown on challenge card and builder page */
