@@ -25,11 +25,22 @@ export const metadata = {
  */
 export default function SysSimulationPage() {
   return (
-    <>
+    <div style={{ minHeight: '100vh', backgroundColor: '#0a0f1a' }}>
+      <nav
+        className="sticky top-0 z-10 flex h-12 items-center px-6 font-mono"
+        style={{ backgroundColor: '#0f172a', borderBottom: '0.5px solid #1e293b' }}
+      >
+        <span className="text-sm font-semibold" style={{ color: '#378ADD' }}>
+          arch-puzzle
+        </span>
+        <span className="ml-2 text-xs" style={{ color: '#62738a' }}>
+          system design playground
+        </span>
+      </nav>
       <MobileBlock />
       <div className="hidden max-w-3xl mx-auto px-6 py-10 lg:block" style={{ backgroundColor: '#0a0f1a' }}>
         <ChallengeList problems={problems} />
       </div>
-    </>
+    </div>
   )
 }
