@@ -15,10 +15,6 @@ import ChallengeList from '@/components/simulation/ChallengeList'
 import MobileBlock from '@/components/simulation/MobileBlock'
 import { problems } from '@/problems'
 
-export const metadata = {
-  title: 'arch-puzzle — system design challenges',
-  description: 'Learn distributed systems by building and simulating real architectures.',
-}
 
 /**
  * SysSimulationPage - renders the desktop challenge list and mobile block.
