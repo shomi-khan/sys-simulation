@@ -117,7 +117,7 @@ export default function ResultSummary({
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div
         className="
-          flex w-full max-w-3xl max-h-[90vh]
+          flex w-full max-w-3xl max-h-[80vh]
           bg-[#0a0f1a] border border-[#1e293b] rounded-md
           overflow-hidden shadow-2xl
         "
@@ -210,7 +210,7 @@ export default function ResultSummary({
 
         {/* Right panel */}
         <div
-          className="w-[220px] flex-shrink-0 flex flex-col border-l border-[#1e293b]"
+          className="w-[300px] flex-shrink-0 flex flex-col border-l border-[#1e293b]"
           style={{ backgroundColor: '#060d0a' }}
         >
           <div className="text-[9px] text-[#1a3a1a] uppercase tracking-widest px-3 py-2 border-b border-[#0d1f14] flex-shrink-0">
@@ -224,14 +224,14 @@ export default function ResultSummary({
             {logs.map((entry, idx) => (
               <div
                 key={idx}
-                className="whitespace-nowrap overflow-hidden text-ellipsis mb-1"
+                className="flex gap-2 mb-1"
               >
-                <span className="text-[#334155]">
+                <div className="text-[#334155]">
                   [{formatTime(entry.second)}]
-                </span>{' '}
-                <span style={{ color: levelColors[entry.level] }}>
+                </div>
+                <div style={{ color: levelColors[entry.level] }}>
                   {entry.message}
-                </span>
+                </div>
               </div>
             ))}
           </div>
